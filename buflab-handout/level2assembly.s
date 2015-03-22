@@ -1,3 +1,3 @@
 movl $0x238d4669, 0x804c0e4
-push 0x08048d4c
+pushl 0x08048d4c
 ret
