@@ -1,3 +1,3 @@
-gcc -c -m32 level3assembly.s
-objdump -d level3assembly.o > level3assembly.d
-cat level3assembly.d
+gcc -c -m32 level4assembly.s
+objdump -d level4assembly.o > level4assembly.d
+cat level4assembly.d
