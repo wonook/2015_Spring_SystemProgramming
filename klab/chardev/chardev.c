@@ -9,9 +9,8 @@
 
 #include "chardev.h"
 #define SUCCESS 0
-#define DEVICE_NAME "char_dev"
+#define DEVICE_NAME "chardev"
 #define BUF_LEN 80
-#define MAJOR_NUMBER 77
 
 /* 
  * Is the device open right now? Used to prevent
