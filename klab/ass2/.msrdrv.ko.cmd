@@ -1,0 +1,1 @@
+cmd_/mnt/hgfs/shared/SystemProgramming/klab/ass2/msrdrv.ko := ld -r -m elf_x86_64 -T /usr/src/linux-headers-3.13.0-37-generic/scripts/module-common.lds --build-id  -o /mnt/hgfs/shared/SystemProgramming/klab/ass2/msrdrv.ko /mnt/hgfs/shared/SystemProgramming/klab/ass2/msrdrv.o /mnt/hgfs/shared/SystemProgramming/klab/ass2/msrdrv.mod.o
