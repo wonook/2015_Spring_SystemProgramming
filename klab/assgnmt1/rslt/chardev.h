@@ -1,5 +1,5 @@
 /*
- * chardev.h - the header file with the ioctl definitions.
+ *  chardev.h - the header file with the ioctl definitions.
  *
  *  The declarations here have to be in a header file, because
  *  they need to be known both to the kernel module
@@ -16,7 +16,7 @@
  * registration any more, because ioctls need to know 
  * it. 
  */
-#define MAJOR_NUM 58
+#define MAJOR_NUM 77
 
 /* 
  * Set the message of the device driver 
@@ -61,6 +61,6 @@
 /* 
  * The name of the device file 
  */
-#define DEVICE_FILE_NAME "char_dev"
+#define DEVICE_FILE_NAME "chardev"
 
 #endif

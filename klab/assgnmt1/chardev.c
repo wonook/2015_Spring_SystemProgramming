@@ -7,6 +7,8 @@
 #include <linux/fs.h>
 #include <asm/uaccess.h>  /* for get_user and put_user */
 
+#include <linux/sched.h> /* schedule */
+
 #include "chardev.h"
 #define SUCCESS 0
 #define DEVICE_NAME "char_dev"
@@ -72,6 +74,8 @@ static int device_release(struct inode *inode, struct file *file)
 /* 
  * This function is called whenever a process which has already opened the
  * device file attempts to read from it.
+ *
+ * --> this reads `length` of the `*file` to `*buffer`
  */
 static ssize_t device_read(struct file *file, /* see include/linux/fs.h   */
          char __user * buffer,  /* buffer to be
@@ -126,9 +130,10 @@ static ssize_t device_read(struct file *file, /* see include/linux/fs.h   */
 /* 
  * This function is called when somebody tries to
  * write into our device file. 
+ *
+ * --> get_user(Message[i], buffer + i);
  */
-static ssize_t
-device_write(struct file *file,
+static ssize_t device_write(struct file *file,
        const char __user * buffer, size_t length, loff_t * offset)
 {
   int i;
@@ -157,6 +162,19 @@ device_write(struct file *file,
  * If the ioctl is write or read/write (meaning output is returned to the
  * calling process), the ioctl call returns the output of this function.
  *
+ */
+
+/*
+ * REFERENCE
+ * https://jlmedina123.wordpress.com/2013/08/13/current-variable-and-task_struct/
+ *
+ * struct task_struct {
+ *  volatile long state;    // -1 unrunnable, 0 runnable, >0 stopped
+ *  void *stack;
+ *  atomic_t usage;
+ *  unsigned int flags;     // per process flags, defined below
+ *  unsigned int ptrace;
+ * }
  */
 int device_ioctl(struct inode *inode, /* see include/linux/fs.h */
      struct file *file, /* ditto */
