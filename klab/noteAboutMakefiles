@@ -1,0 +1,7 @@
+
+make all: insmod
+
+makerun1: prints out process tree
+makerou2: performance counter
+
+make --> makerun1 --> makerun2 --> make clean
