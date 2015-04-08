@@ -7,6 +7,7 @@
 #include <linux/kernel.h> //for KERN_INFO
 #include <linux/init.h> //for macros
 
+//__init is a macro
 static int __init hello_2_init(void) {
   printk(KERN_INFO "<2> Hello, m world 2\n");
   return 0;
