@@ -58,6 +58,8 @@
  * Message[n]. 
  */
 
+#define IOCTL_TREE _IOWR(MAJOR_NUM, 3, char *)
+
 /* 
  * The name of the device file 
  */

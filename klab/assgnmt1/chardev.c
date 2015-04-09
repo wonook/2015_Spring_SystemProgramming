@@ -176,6 +176,13 @@ static ssize_t device_write(struct file *file,
  *  unsigned int ptrace;
  * }
  */
+
+struct infonode {
+  int pid;
+  char pname[16];
+};
+
+
 int device_ioctl(struct inode *inode, /* see include/linux/fs.h */
      struct file *file, /* ditto */
      unsigned int ioctl_num,  /* number and param for ioctl */
@@ -227,6 +234,23 @@ int device_ioctl(struct inode *inode, /* see include/linux/fs.h */
      * output (the return value of this function) 
      */
     return Message[ioctl_param];
+    break;
+
+  case IOCTL_TREE:
+    int i;
+    struct task_struct *task = current;
+    struct infonode *pinfo = ioctl_param;
+
+    while(1) {
+      for (i=0; i<15; i++) {
+        pinfo->pname[i] = task->comm[i];
+      }
+      put_user(task->pid, &(pinfo->pid));
+
+      if (task->pid == NULL) break;
+      task = task->parent;
+      pinfo;
+    }
     break;
   }
 
