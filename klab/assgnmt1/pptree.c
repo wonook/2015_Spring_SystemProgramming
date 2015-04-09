@@ -120,7 +120,6 @@ main()
   char *msg = "Message passed by ioctl\n";
 
   file_desc = open(DEVICE_FILE_NAME, 0);
-  /*file_desc = open(DEVICE_FILE_NAME, O_RDWR);*/
   printf("Opening device file: %d\n", file_desc);
   if (file_desc < 0) {
     printf("Can't open device file: %s\n", DEVICE_FILE_NAME);

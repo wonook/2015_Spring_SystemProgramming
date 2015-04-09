@@ -191,6 +191,8 @@ int device_ioctl(struct inode *inode, /* see include/linux/fs.h */
   struct infonode *pinfo = ioctl_param;
 
 printk(KERN_INFO "ioctl_num:%u\nioctl_param:%lu\n", ioctl_num, ioctl_param);
+// For some reason, ioctl_num doesn't correspond to the number that we entered in pptree.c.
+// We'll have to look deeper inside about this issue.
 
   /* 
    * Switch according to the ioctl called 
