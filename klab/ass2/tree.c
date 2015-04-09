@@ -116,7 +116,8 @@ ioctl_get_nth_byte(int file_desc)
  */
 int main()
 {
-	int file_desc;
+	int file_desc, ret_val;
+	char *msg = "Message passed by ioctl\n";
 
 	file_desc = open("/dev/chardev", O_RDWR);
         printf("the open funciont's result is: %d\n", file_desc);

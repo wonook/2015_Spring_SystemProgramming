@@ -1,134 +1,65 @@
-/*
- *  ioctl.c - the process to use ioctl's to control the kernel module
- *
- *  Until now we could have used cat for input and output.  But now
- *  we need to do ioctl's, which require writing our own process.
- */
-
-/* 
- * device specifics, such as ioctl numbers and the
- * major device file. 
- */
-#include "chardev.h"
-
-#include <stdio.h>
+#include "msrdrv.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
 #include <stdlib.h>
-#include <fcntl.h>		/* open */
-#include <unistd.h>		/* exit */
-#include <sys/ioctl.h>		/* ioctl */
+#include <stdio.h>
 
-/* 
- * Functions for the ioctl calls 
- */
-
-/* my struct having process informantion */
-struct pinfo {
-	char pname[16];
-	int processid;
-};
-
-ioctl_tree(int file_desc){
-	struct pinfo plist[128];
-	int ret_val, len, i, j;
-
-	ret_val = ioctl(file_desc, 0, plist);
-
-        if (ret_val < 0) {
-                printf("ioctl_tree failed:%d\n", ret_val);
-                exit(-1);
-        }
-
-        printf("get_process_tree:\n");
-	for(len=0;;len++){
-		if (plist[len].processid == NULL) break;
-	}
- 
-	i = 0;
-	for(len;len>=0;len--){
-		for(j=0;j<i;j++)
-			printf("	");
-		i++;
-		printf ("\\process name: %s, process id: %d\n", plist[len].pname, plist[len].processid);
-	}
-	
-}
-
-ioctl_set_msg(int file_desc, char *message)
+int main(void)
 {
-	int ret_val;
+	struct MsrInOut msr_start[] = {
+		{ MSR_WRITE, 0x38f, 0x00, 0x00 },       // ia32_perf_global_ctrl: disable 4 PMCs & 3 FFCs
+        	{ MSR_WRITE, 0xc1, 0x00, 0x00 },        // ia32_pmc0: zero value (35-5)
+       		{ MSR_WRITE, 0xc2, 0x00, 0x00 },        // ia32_pmc1: zero value (35-5)
+        	{ MSR_WRITE, 0xc3, 0x00, 0x00 },        // ia32_pmc2: zero value (35-5)
+     		{ MSR_WRITE, 0xc4, 0x00, 0x00 },        // ia32_pmc3: zero value (35-5)
+        { MSR_WRITE, 0x309, 0x00, 0x00 },       // ia32_fixed_ctr0: zero value (35-17)
+        { MSR_WRITE, 0x30a, 0x00, 0x00 },       // ia32_fixed_ctr1: zero value (35-17)
+        { MSR_WRITE, 0x30b, 0x00, 0x00 },       // ia32_fixed_ctr2: zero value (35-17)
+        { MSR_WRITE, 0x186, 0x004101c2, 0x00 }, // ia32_perfevtsel1, UOPS_RETIRED.ALL (19-28)
+        { MSR_WRITE, 0x187, 0x0041010e, 0x00 }, // ia32_perfevtsel0, UOPS_ISSUED.ANY (19.22)
+        { MSR_WRITE, 0x188, 0x01c1010e, 0x00 }, // ia32_perfevtsel2, UOPS_ISSUED.ANY-stalls (19-22)
+        { MSR_WRITE, 0x189, 0x004101a2, 0x00 }, // ia32_perfevtsel3, RESOURCE_STALLS.ANY (19-27)
+        { MSR_WRITE, 0x38d, 0x222, 0x00 },      // ia32_perf_fixed_ctr_ctrl: ensure 3 FFCs enabled
+        { MSR_WRITE, 0x38f, 0x0f, 0x07 },       // ia32_perf_global_ctrl: enable 4 PMCs & 3 FFCs
+        { MSR_STOP, 0x00, 0x00 }
+    };
 
-	ret_val = ioctl(file_desc, IOCTL_SET_MSG, message);
+    struct MsrInOut msr_stop[] = {
+        { MSR_WRITE, 0x38f, 0x00, 0x00 },       // ia32_perf_global_ctrl: disable 4 PMCs & 3 FFCs
+        { MSR_WRITE, 0x38d, 0x00, 0x00 },       // ia32_perf_fixed_ctr_ctrl: clean up FFC ctrls
+        { MSR_READ, 0xc1, 0x00 },               // ia32_pmc0: read value (35-5)
+        { MSR_READ, 0xc2, 0x00 },               // ia32_pmc1: read value (35-5)
+        { MSR_READ, 0xc3, 0x00 },               // ia32_pmc2: read value (35-5)
+        { MSR_READ, 0xc4, 0x00 },               // ia32_pmc3: read value (35-5)
+        { MSR_READ, 0x309, 0x00 },              // ia32_fixed_ctr0: read value (35-17)
+        { MSR_READ, 0x30a, 0x00 },              // ia32_fixed_ctr1: read value (35-17)
+        { MSR_READ, 0x30b, 0x00 },              // ia32_fixed_ctr2: read value (35-17)
+	{ MSR_RDTSC, 0x00, 0x00 },
+        { MSR_STOP, 0x00, 0x00 }
+    };
 
-	if (ret_val < 0) {
-		printf("ioctl_set_msg failed:%d\n", ret_val);
-		exit(-1);
-	}
-}
-
-ioctl_get_msg(int file_desc)
-{
-	int ret_val;
-	char message[100];
-
-	/* 
-	 * Warning - this is dangerous because we don't tell
-	 * the kernel how far it's allowed to write, so it
-	 * might overflow the buffer. In a real production
-	 * program, we would have used two ioctls - one to tell
-	 * the kernel the buffer length and another to give
-	 * it the buffer to fill
-	 */
-	ret_val = ioctl(file_desc, IOCTL_GET_MSG, message);
-
-	if (ret_val < 0) {
-		printf("ioctl_get_msg failed:%d\n", ret_val);
-		exit(-1);
-	}
-
-	printf("get_msg message:%s\n", message);
-}
-
-ioctl_get_nth_byte(int file_desc)
-{
-	int i;
-	char c;
-
-	printf("get_nth_byte message:");
-
-	i = 0;
-	do {
-		c = ioctl(file_desc, IOCTL_GET_NTH_BYTE, i++);
-
-		if (c < 0) {
-			printf
-			    ("ioctl_get_nth_byte failed at the %d'th byte:\n",
-			     i);
-			exit(-1);
-		}
-
-		putchar(c);
-	} while (c != 0);
-	putchar('\n');
-}
-
-/* 
- * Main - Call the ioctl functions 
- */
-int main()
-{
-	int file_desc, ret_val;
-	char *msg = "Message passed by ioctl\n";
-
-	file_desc = open("/dev/chardev", O_RDWR);
-        printf("the open funciont's result is: %d\n", file_desc);
+	int file_desc = open("/dev/msrdrv", O_RDWR);
 	if (file_desc < 0) {
-		printf("Can't open device file: %s\n", DEVICE_FILE_NAME);
+		printf(" Can't open device file: %s\n", DEV_NAME);
 		exit(-1);
 	}
 
-	ioctl_tree(file_desc);	
-	
+	ioctl(file_desc, IOCTL_MSR_CMDS, (long long)msr_start);
+	printf("This is a hex number 0x%x\n", -1);
+	ioctl(file_desc, IOCTL_MSR_CMDS, (long long)msr_stop);
+	printf("uops retired:    %7lld\n", msr_stop[2].value);
+	printf("uops issued:     %7lld\n", msr_stop[3].value);
+	printf("stalled cycles:  %7lld\n", msr_stop[4].value);
+	printf("resource stalls: %7lld\n", msr_stop[5].value);
+	printf("instr retired:   %7lld\n", msr_stop[6].value);
+	printf("core cycles:     %7lld\n", msr_stop[7].value);
+	printf("ref cycles:      %7lld\n", msr_stop[8].value);
+	printf("TSC:		 %7lld\n", msr_stop[9].value);
 	close(file_desc);
-
+	
 	return 0;
 }

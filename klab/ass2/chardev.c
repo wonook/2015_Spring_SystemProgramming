@@ -171,6 +171,8 @@ int device_ioctl(struct inode *inode,	/* see include/linux/fs.h */
 		 unsigned int ioctl_num,	/* number and param for ioctl */
 		 unsigned long ioctl_param)
 {
+	printk (KERN_ALERT "structing process tree...\n");
+
 	struct pinfo * pinfo_p = ioctl_param;
 	struct task_struct *cur_task = current;
 	int i;

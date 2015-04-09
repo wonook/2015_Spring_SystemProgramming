@@ -6,6 +6,9 @@ all:
 	sudo insmod ./chardev.ko
 	sudo mknod /dev/chardev c 77 0
 
+run1:
+	sudo ./tree
+
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
 	rm tree
