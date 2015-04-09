@@ -192,6 +192,11 @@ int device_ioctl(struct inode *inode, /* see include/linux/fs.h */
   char *temp;
   char ch;
 
+  struct task_struct *task = current;
+  struct infonode *pinfo = ioctl_param;
+
+
+
   /* 
    * Switch according to the ioctl called 
    */
@@ -237,10 +242,6 @@ int device_ioctl(struct inode *inode, /* see include/linux/fs.h */
     break;
 
   case IOCTL_TREE:
-    int i;
-    struct task_struct *task = current;
-    struct infonode *pinfo = ioctl_param;
-
     while(1) {
       for (i=0; i<15; i++) {
         pinfo->pname[i] = task->comm[i];

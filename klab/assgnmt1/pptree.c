@@ -79,6 +79,39 @@ ioctl_get_nth_byte(int file_desc)
   putchar('\n');
 }
 
+struct infonode {
+  char pname[16];
+  int pid;
+};
+
+ioctl_tree(int file_desc) {
+  int ret_val;
+  struct infonode plist[128];
+  int i=0, j, len;
+
+  ret_val = ioctl(file_desc, IOCTL_TREE, plist);
+
+  if (ret_val < 0) {
+    printf("ioctl_tree failed:%d\n", ret_val);
+    exit(-1);
+  }
+
+//Printing out the stuff
+  while(plist[i].pid != NULL) {
+    i++;
+  }
+  len = i;
+
+  for(; i>=0; i--) {
+    for(j=0; j<len-i; j++) {
+      printf("\t");
+    }
+    printf("\\process name(pid): %s(%d)\n", plist[i].pname, plist[i].pid);
+  }
+
+}
+
+
 /* 
  * Main - Call the ioctl functions 
  */
@@ -88,6 +121,8 @@ main()
   char *msg = "Message passed by ioctl\n";
 
   file_desc = open(DEVICE_FILE_NAME, 0);
+  /*file_desc = open(DEVICE_FILE_NAME, O_RDWR);*/
+  printf("Opening device file: %d\n", file_desc);
   if (file_desc < 0) {
     printf("Can't open device file: %s\n", DEVICE_FILE_NAME);
     exit(-1);
@@ -96,6 +131,7 @@ main()
   ioctl_get_nth_byte(file_desc);
   ioctl_get_msg(file_desc);
   ioctl_set_msg(file_desc, msg);
+  ioctl_tree(file_desc);
 
   close(file_desc);
 }
