@@ -79,11 +79,6 @@ ioctl_get_nth_byte(int file_desc)
   putchar('\n');
 }
 
-struct infonode {
-  char pname[16];
-  int pid;
-};
-
 ioctl_tree(int file_desc) {
   int ret_val;
   struct infonode plist[128];
@@ -128,9 +123,9 @@ main()
     exit(-1);
   }
 
-  ioctl_get_nth_byte(file_desc);
-  ioctl_get_msg(file_desc);
-  ioctl_set_msg(file_desc, msg);
+  /*ioctl_get_nth_byte(file_desc);*/
+  /*ioctl_get_msg(file_desc);*/
+  /*ioctl_set_msg(file_desc, msg);*/
   ioctl_tree(file_desc);
 
   close(file_desc);

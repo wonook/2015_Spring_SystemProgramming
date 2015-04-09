@@ -177,11 +177,6 @@ static ssize_t device_write(struct file *file,
  * }
  */
 
-struct infonode {
-  int pid;
-  char pname[16];
-};
-
 
 int device_ioctl(struct inode *inode, /* see include/linux/fs.h */
      struct file *file, /* ditto */
@@ -200,60 +195,60 @@ int device_ioctl(struct inode *inode, /* see include/linux/fs.h */
   /* 
    * Switch according to the ioctl called 
    */
-  switch (ioctl_num) {
-  case IOCTL_SET_MSG:
+/*  switch (ioctl_num) {*/
+  /*case IOCTL_SET_MSG:*/
     /* 
      * Receive a pointer to a message (in user space) and set that
      * to be the device's message.  Get the parameter given to 
      * ioctl by the process. 
      */
-    temp = (char *)ioctl_param;
+    /*temp = (char *)ioctl_param;*/
 
     /* 
      * Find the length of the message 
      */
-    get_user(ch, temp);
-    for (i = 0; ch && i < BUF_LEN; i++, temp++)
-      get_user(ch, temp);
+    /*get_user(ch, temp);*/
+    /*for (i = 0; ch && i < BUF_LEN; i++, temp++)*/
+      /*get_user(ch, temp);*/
 
-    device_write(file, (char *)ioctl_param, i, 0);
-    break;
+    /*device_write(file, (char *)ioctl_param, i, 0);*/
+    /*break;*/
 
-  case IOCTL_GET_MSG:
+  /*case IOCTL_GET_MSG:*/
     /* 
      * Give the current message to the calling process - 
      * the parameter we got is a pointer, fill it. 
      */
-    i = device_read(file, (char *)ioctl_param, 99, 0);
+    /*i = device_read(file, (char *)ioctl_param, 99, 0);*/
 
     /* 
      * Put a zero at the end of the buffer, so it will be 
      * properly terminated 
      */
-    put_user('\0', (char *)ioctl_param + i);
-    break;
+    /*put_user('\0', (char *)ioctl_param + i);*/
+    /*break;*/
 
-  case IOCTL_GET_NTH_BYTE:
+  /*case IOCTL_GET_NTH_BYTE:*/
     /* 
      * This ioctl is both input (ioctl_param) and 
      * output (the return value of this function) 
      */
-    return Message[ioctl_param];
-    break;
+    /*return Message[ioctl_param];*/
+    /*break;*/
 
-  case IOCTL_TREE:
+  /*case IOCTL_TREE:*/
     while(1) {
-      for (i=0; i<15; i++) {
+      for (i=0; i<16; i++) {
         pinfo->pname[i] = task->comm[i];
       }
       put_user(task->pid, &(pinfo->pid));
 
       if (task->pid == NULL) break;
       task = task->parent;
-      pinfo;
+      pinfo++;
     }
-    break;
-  }
+    /*break;*/
+  /*}*/
 
   return SUCCESS;
 }
@@ -317,6 +312,4 @@ void cleanup_module()
    * Unregister the device 
    */
   unregister_chrdev(MAJOR_NUM, DEVICE_NAME);
-
-  return 0;
 }

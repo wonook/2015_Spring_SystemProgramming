@@ -58,7 +58,15 @@
  * Message[n]. 
  */
 
-#define IOCTL_TREE _IOWR(MAJOR_NUM, 3, char *)
+#ifndef STRUCT_INFONODE
+#define STRUCT_INFONODE
+struct infonode {
+  int pid;
+  char pname[16];
+};
+#endif
+
+#define IOCTL_TREE _IOR(MAJOR_NUM, 3, struct infonode *)
 
 /* 
  * The name of the device file 
