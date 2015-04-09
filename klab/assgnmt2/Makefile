@@ -21,5 +21,7 @@ run2:
 
 clean:
 	rm -f leaf0ah PMU_prac *.ko *.o *.so *.order *.symvers
+	rm *.mod.* .msrdrv.*
+	rm -rf .tmp_versions
 	sudo rmmod msrdrv
 	sudo rm /dev/msrdrv
