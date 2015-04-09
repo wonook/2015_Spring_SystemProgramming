@@ -190,12 +190,12 @@ int device_ioctl(struct inode *inode, /* see include/linux/fs.h */
   struct task_struct *task = current;
   struct infonode *pinfo = ioctl_param;
 
-
+printk(KERN_INFO "ioctl_num:%u\nioctl_param:%lu\n", ioctl_num, ioctl_param);
 
   /* 
    * Switch according to the ioctl called 
    */
-/*  switch (ioctl_num) {*/
+  /*switch (ioctl_num) {*/
   /*case IOCTL_SET_MSG:*/
     /* 
      * Receive a pointer to a message (in user space) and set that

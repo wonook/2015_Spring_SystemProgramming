@@ -25,6 +25,7 @@ ioctl_set_msg(int file_desc, char *message)
 {
   int ret_val;
 
+  printf("IOCTL_SET_MSG:%lu\n", IOCTL_SET_MSG);
   ret_val = ioctl(file_desc, IOCTL_SET_MSG, message);
 
   if (ret_val < 0) {
@@ -38,6 +39,7 @@ ioctl_get_msg(int file_desc)
   int ret_val;
   char message[100];
 
+  printf("IOCTL_GET_MSG:%lu\n", IOCTL_GET_MSG);
   /* 
    * Warning - this is dangerous because we don't tell
    * the kernel how far it's allowed to write, so it
@@ -61,6 +63,7 @@ ioctl_get_nth_byte(int file_desc)
   int i;
   char c;
 
+  printf("IOCTL_GET_NTH_BYTE:%lu\n", IOCTL_GET_NTH_BYTE);
   printf("get_nth_byte message:");
 
   i = 0;
@@ -84,6 +87,7 @@ ioctl_tree(int file_desc) {
   struct infonode plist[128];
   int i=0, j, len;
 
+  printf("IOCTL_TREE:%lu\n", IOCTL_TREE);
   ret_val = ioctl(file_desc, IOCTL_TREE, plist);
 
   if (ret_val < 0) {
