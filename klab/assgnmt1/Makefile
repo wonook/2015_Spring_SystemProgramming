@@ -6,6 +6,9 @@ all:
 	sudo insmod chardev.ko
 	gcc -o pptree pptree.c
 
+run1:
+	sudo ./pptree
+
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
 	sudo rmmod chardev
