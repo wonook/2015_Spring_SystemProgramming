@@ -5,25 +5,27 @@
 
 #include "msrdrv.h"
 
+//#define _MG_DEBUG
 #ifdef _MG_DEBUG
 #define dprintk(args...) printk(args);
 #else
 #define dprintk(args...)
 #endif
 
-static int msrdrv_open (struct inode *i, struct file *f){
+
+static int msrdrv_open (struct inode *i, struct file *f) {
 	return 0;
 }
 
-static int msrdrv_release (struct inode *i, struct file *f){
+static int msrdrv_release (struct inode *i, struct file *f) {
 	return 0;
 }
 
-static int msrdrv_read (struct file *f, char *b, size_t c, loff_t* o){
+static int msrdrv_read (struct file *f, char *b, size_t c, loff_t* o) {
 	return 0;
 }
 
-static int msrdrv_write (struct file *f, const char *b, size_t c, loff_t *o){
+static int msrdrv_write (struct file *f, const char *b, size_t c, loff_t *o) {
 	return 0;
 }
 
@@ -82,7 +84,7 @@ static long msrdrv_ioctl (struct file *f, unsigned int ioctl_num, unsigned long 
 			printk (KERN_ALERT "Module " DEV_NAME ": seen MSR_STOP command\n");
 			goto label_end;
 		case MSR_READ:
-                        printk (KERN_ALERT "Module " DEV_NAME ": seen MSR_READ command\n");
+      printk (KERN_ALERT "Module " DEV_NAME ": seen MSR_READ command\n");
 			msrops->value = read_msr(msrops->ecx);
 			break;
 		case MSR_WRITE:

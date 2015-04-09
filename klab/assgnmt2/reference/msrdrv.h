@@ -28,12 +28,9 @@ struct MsrInOut {
     struct {
       unsigned int eax;     // low double word
       unsigned int edx;     // high double word
-
     };
     unsigned long long value; // quad word
-
   };
-
 }; // msrdrv.h:27:1: warning: packed attribute is unnecessary for ‘MsrInOut’ [-Wpacked]
 
 #endif
