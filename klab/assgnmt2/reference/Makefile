@@ -1,7 +1,6 @@
 obj-m += msrdrv.o
 
-all: msrdrv cpu_pmc_ver leaf0ah 
-	#PMU
+all: msrdrv cpu_pmc_ver leaf0ah msrtest
 
 msrdrv:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
@@ -17,15 +16,15 @@ leaf0ah: leaf0ah.o
 leaf0ah.o: leaf0ah.s
 	as -g -o leaf0ah.o leaf0ah.s
 
-#PMU:
-	#gcc -I. -O2 -o PMU_prac PMU_prac.c
+msrtest:
+	gcc -g -I. -O2 -o msrtest msrtest.c
 
-#run2:
-	#sudo ./PMU
+run2:
+	sudo ./msrtest
 
 clean:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+	rm -f leaf0ah cpu_pmc_ver msrtest *.ko *.o *.so *.order *.symvers
+	rm *.mod.* .msrdrv.*
+	rm -rf .tmp_versions
 	sudo rmmod msrdrv
 	sudo rm /dev/msrdrv
-	rm cpu_pmc_ver
-	rm -f leaf0ah PMU_prac *.ko *.o *.so *.order *.symvers
