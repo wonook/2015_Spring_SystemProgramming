@@ -128,6 +128,19 @@ int read_counter (int fd, int event) {
     return 0;
 }
 
+void read_tsc(int fd) {
+    struct MsrInOut msr_readtsc[] = {
+        { MSR_RDTSC, 0x00, 0x00 },
+        { MSR_STOP, 0x00, 0x00 }
+    };
+
+
+    ioctl(fd, IOCTL_MSR_CMDS, (long long)msr_readtsc);
+    printf("Read TSC register.\n");
+
+    printf("TSC: %7lld\n", msr_readtsc[0].value);
+
+}
 
 
 static int loadDriver()
@@ -213,6 +226,7 @@ int main(void)
         a = read_counter(fd, select_event());
         if(a<0) break;
     }
+    read_tsc(fd);
     closeDriver(fd);
     return 0;
 }
