@@ -5,7 +5,7 @@
 #include <linux/types.h>
 
 #define DEV_NAME "msrdrv"
-#define DEV_MAJOR 34
+#define DEV_MAJOR 33
 #define DEV_MINOR 0
 
 #define MSR_VEC_LIMIT 32
