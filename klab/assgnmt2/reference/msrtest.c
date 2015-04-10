@@ -8,16 +8,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-
 static int loadDriver()
 {
     int fd;
-    /*fd = open("/dev/" DEV_NAME, O_RDWR);*/
-    fd = open("/dev/" DEV_NAME, 2);
-    printf("Opening device file: %s...\n", "/dev/" DEV_NAME);
+    fd = open("/dev/" DEV_NAME, O_RDWR);
     if (fd == -1) {
-        printf("Can't open device file: %s\n", "/dev/" DEV_NAME);
-        exit(-1);
         perror("Failed to open /dev/" DEV_NAME);
     }
     return fd;
@@ -28,7 +23,6 @@ static void closeDriver(int fd)
     int e;
     e = close(fd);
     if (e == -1) {
-        printf("Failed to close fd");
         perror("Failed to close fd");
     }
 }
