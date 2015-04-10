@@ -5,7 +5,7 @@ all: msrdrv cpu_pmc_ver leaf0ah msrtest
 msrdrv:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 	sudo insmod ./msrdrv.ko
-	sudo mknod /dev/msrdrv c 34 0
+	sudo mknod /dev/msrdrv c 223 0
 
 cpu_pmc_ver:
 	gcc -o cpu_pmc_ver cpu_pmc_ver.c

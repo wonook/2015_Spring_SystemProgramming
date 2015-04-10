@@ -123,8 +123,7 @@ void read_counter (int file_desc, int event) {
 static int loadDriver()
 {
     int fd;
-    /*fd = open("/dev/" DEV_NAME, O_RDWR);*/
-    fd = open("/dev/" DEV_NAME, 2);
+    fd = open("/dev/" DEV_NAME, O_RDWR);
     printf("Opening device file: %s...\n", "/dev/" DEV_NAME);
     if (fd == -1) {
         printf("Can't open device file: %s\n", "/dev/" DEV_NAME);
@@ -138,6 +137,7 @@ static void closeDriver(int fd)
 {
     int e;
     e = close(fd);
+    printf("Closing device file...\n");
     if (e == -1) {
         printf("Failed to close fd");
         perror("Failed to close fd");
