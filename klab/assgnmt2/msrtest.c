@@ -33,7 +33,7 @@ void reset_counter (int file_desc) {
 int select_event (int file_desc) {
     int event;
 
-    printf ("Please select PMU event to monitor!\n");
+    printf ("Please select the PMU event to monitor!\n");
     printf ("1: uops retired.\n");
     printf ("2: uops issued.\n");
     printf ("3. stalled cycles.\n");
@@ -43,8 +43,8 @@ int select_event (int file_desc) {
     printf ("7. ref cycles.\n");
 
     while (1){
-        printf ("Type yout event: ");
-        scanf ("%d",event);
+        printf ("Type your event: ");
+        scanf ("%d", &event);
         if ((0<event)&&(event<8)) break;
         else printf ("Incorrect input!\n");
     }
@@ -96,13 +96,22 @@ void read_counter (int file_desc, int event) {
             break;
         case 2: // uops issued
             printf ("uops issued: ");
+            break;
         case 3: // stalled cycles
             printf ("stalled cycles: ");
+            break;
         case 4: // resource stalls
             printf ("resource stalls: ");
+            break;
         case 5: // instr retired
+            printf ("instr retired: ");
+            break;
         case 6: // core cycles
+            printf("core cycles: ");
+            break;
         case 7: // ref cycles
+            printf("ref cycles: ");
+            break;
     }
 
     printf ("%7lld\n", msr_read[event-1].value);
@@ -114,9 +123,11 @@ void read_counter (int file_desc, int event) {
 static int loadDriver()
 {
     int fd;
-    fd = open("/dev/" DEV_NAME, O_RDWR);
-    if (fd < 0) {
-        printf("Can't open device file: %s\n", DEV_NAME);
+    /*fd = open("/dev/" DEV_NAME, O_RDWR);*/
+    fd = open("/dev/" DEV_NAME, 2);
+    printf("Opening device file: %s...\n", "/dev/" DEV_NAME);
+    if (fd == -1) {
+        printf("Can't open device file: %s\n", "/dev/" DEV_NAME);
         exit(-1);
         perror("Failed to open /dev/" DEV_NAME);
     }
