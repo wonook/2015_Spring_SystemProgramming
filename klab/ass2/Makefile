@@ -14,12 +14,12 @@ leaf0ah.o: leaf0ah.s
 	as -g -o leaf0ah.o leaf0ah.s
 
 PMU:
-	gcc -I. -O2 -o PMU_prac PMU_prac.c
+	gcc -I. -O2 -o PMU PMU.c
 
 run2:
-	sudo ./PMU_prac
+	sudo ./PMU
 
 clean:
-	rm -f leaf0ah PMU_prac *.ko *.o *.so *.order *.symvers
+	rm -f leaf0ah PMU *.ko *.o *.so *.order *.symvers
 	sudo rmmod msrdrv
 	sudo rm /dev/msrdrv
