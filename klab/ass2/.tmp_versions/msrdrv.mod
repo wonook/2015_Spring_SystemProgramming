@@ -1,2 +1,2 @@
-/mnt/hgfs/shared/SystemProgramming/klab/ass2/msrdrv.ko
-/mnt/hgfs/shared/SystemProgramming/klab/ass2/msrdrv.o
+/mnt/hgfs/SP/SystemProgramming/klab/ass2/msrdrv.ko
+/mnt/hgfs/SP/SystemProgramming/klab/ass2/msrdrv.o

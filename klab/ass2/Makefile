@@ -17,7 +17,7 @@ PMU:
 	gcc -I. -O2 -o PMU_prac PMU_prac.c
 
 run2:
-	sudo ./PMU
+	sudo ./PMU_prac
 
 clean:
 	rm -f leaf0ah PMU_prac *.ko *.o *.so *.order *.symvers
