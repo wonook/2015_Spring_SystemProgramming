@@ -148,7 +148,7 @@ int main (void) {
 
 	int event, err_check;
 	printf ("Hello! this is PMU counter.\n");
-        printf ("Please select PMU event to monitor!\n");
+        printf ("These are options you can choice!\n");
         printf ("0: exit. \n");
         printf ("1: uops retired.\n");
         printf ("2: uops issued.\n");
@@ -161,6 +161,8 @@ int main (void) {
 
 	while (1){
 		if (0 == (event = select_event())) break;
+	    	reset_counter(file_desc);
+		start_counter(file_desc);
 		if (0 > (err_check = read_counter (file_desc, event))) break;
 	}
 	
