@@ -48,15 +48,6 @@ int select_event () {
 	int event;
 
 	printf ("Please select PMU event to monitor!\n");
-	printf ("0: exit. \n");
-	printf ("1: uops retired.\n");
-	printf ("2: uops issued.\n");
-	printf ("3. stalled cycles.\n");
-	printf ("4. resource stalls.\n");
-	printf ("5. instr retired.\n");
-	printf ("6. core cycles.\n");
-	printf ("7. ref cycles.\n");
-	printf ("8. all.\n");
 
 	while (1){
 		printf ("Type yout event: ");
@@ -157,6 +148,17 @@ int main (void) {
 
 	int event, err_check;
 	printf ("Hello! this is PMU counter.\n");
+        printf ("Please select PMU event to monitor!\n");
+        printf ("0: exit. \n");
+        printf ("1: uops retired.\n");
+        printf ("2: uops issued.\n");
+        printf ("3. stalled cycles.\n");
+        printf ("4. resource stalls.\n");
+        printf ("5. instr retired.\n");
+        printf ("6. core cycles.\n");
+        printf ("7. ref cycles.\n");
+        printf ("8. all.\n");
+
 	while (1){
 		if (0 == (event = select_event())) break;
 		if (0 > (err_check = read_counter (file_desc, event))) break;
