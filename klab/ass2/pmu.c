@@ -96,25 +96,25 @@ int read_counter (int file_desc, int event) {
 	switch (event) {
 	case 8: // all
 	case 1: // uops retired
-		printf ("uops retired: %7lld\n", msr_read[0].value);
+		printf ("uops retired:    %7lld\n", msr_read[0].value);
 		if (event != 8) break;
 	case 2: // uops issued
-                printf ("uops issued: %7lld\n", msr_read[1].value);
+                printf ("uops issued:     %7lld\n", msr_read[1].value);
                 if (event != 8) break;
 	case 3: // stalled cycles
-                printf ("stalled cycles: %7lld\n", msr_read[2].value);
+                printf ("stalled cycles:  %7lld\n", msr_read[2].value);
 		if (event != 8) break;
 	case 4: // resource stalls
 	        printf ("resource stalls: %7lld\n", msr_read[3].value);
 		if (event != 8) break;
 	case 5: // instr retired
-                printf ("instr retired: %7lld\n", msr_read[4].value);
+                printf ("instr retired:   %7lld\n", msr_read[4].value);
 		if (event != 8) break;
 	case 6: // core cycles
-                printf ("core cycles: %7lld\n", msr_read[5].value);
+                printf ("core cycles:     %7lld\n", msr_read[5].value);
 		if (event != 8) break;
 	case 7: // ref cycles
-                printf ("ref cycles: %7lld\n", msr_read[6].value);
+                printf ("ref cycles:      %7lld\n", msr_read[6].value);
 		break;
 	default:
 		printf ("Incorrect event selected.\n");
@@ -142,7 +142,7 @@ void read_tsc (int file_desc){
 int main (void) {
 	int file_desc = open("/dev/msrdrv", O_RDWR);
 	if (file_desc < 0) {
-		printf("Can't open device file: %s\n", DEV_NAME);
+		printf("Can't open device file: %s\n", DEVICE_FILE_NAME);
 		exit(-1);
 	}
 
@@ -166,7 +166,7 @@ int main (void) {
 	
 	file_desc = close(file_desc);
 	if (file_desc < 0) {
-		printf("Can't close device file: %s\n", DEV_NAME);
+		printf("Can't close device file: %s\n", DEVICE_FILE_NAME);
 		exit(-1);
 	}
 

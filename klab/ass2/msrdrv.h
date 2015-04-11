@@ -1,16 +1,19 @@
+// msrdrv.h - the header file for msrdrv.c
+
 #ifndef _MG_MSRDRV_H
 #define _MG_MSRDRV_H
 
 #include <linux/ioctl.h>
 #include <linux/types.h>
 
-#define DEV_NAME "msrdrv"
-#define DEV_MAJOR 33
-#define DEV_MINOR 0
+#define DEVICE_NAME "msrdrv"
+#define DEVICE_FILE_NAME "msrdrv"
+#define MAJOR_NUM 33	// Major device number. We need this to open device file.
+#define MINOR_NUM 0
 
 #define MSR_VEC_LIMIT 32
 
-#define IOCTL_MSR_CMDS _IO(DEV_MAJOR, 1)
+#define IOCTL_MSR_CMDS _IO(MAJOR_NUM, 1)
 
 enum MsrOperation {
 	MSR_NOP	  = 0,
