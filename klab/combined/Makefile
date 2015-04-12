@@ -23,10 +23,9 @@ run2:
 	sudo ./msrtest
 
 clean:
-	rm -f pptree msrtest *.ko *.o *.so *.order *.symvers
-	rm *.mod.* .msrdrv.*
-	rm -rf .tmp_versions
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
 	sudo rmmod msrdrv
 	sudo rmmod chardev
 	sudo rm /dev/msrdrv
 	sudo rm /dev/char_dev
+	rm pptree msrtest
