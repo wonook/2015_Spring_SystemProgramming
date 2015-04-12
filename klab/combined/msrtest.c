@@ -36,13 +36,13 @@ int select_event () {
     int event;
 
     printf ("Please select a PMU event to monitor");
-    printf ("(0.exit/1.uops retired/");
-    printf ("2.uops issued/");
-    printf ("3.stalled cycles/");
-    printf ("4.resource stalls/");
-    printf ("5.instr retired/");
-    printf ("6.core cycles/");
-    printf ("7.ref cycles):");
+    printf ("(0.continue/ 1.uops retired/");
+    printf ("2.uops issued/ ");
+    printf ("3.stalled cycles/ ");
+    printf ("4.resource stalls/ ");
+    printf ("5.instr retired/ ");
+    printf ("6.core cycles/ ");
+    printf ("7.ref cycles)\nSelection:");
 
     while (1){
         scanf ("%d", &event);
@@ -258,6 +258,13 @@ int main(void)
     /*printf("instr retired:   %7lld\n", msr_stop[6].value);*/
     /*printf("core cycles:     %7lld\n", msr_stop[7].value);*/
     /*printf("ref cycles:      %7lld\n\n", msr_stop[8].value);*/
+    printf("the counter is in its initial state:");
+    while(1) {
+        a = read_counter(fd, select_event());
+        if(a<0) break;
+    }
+    read_tsc(fd);
+ 
     reset_counter(fd);
     start_counter(fd);
     testing();
