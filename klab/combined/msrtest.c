@@ -167,6 +167,46 @@ static void closeDriver(int fd)
     }
 }
 
+static void swap(int *a, int *b) {
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
+    return;
+}
+
+static void printarray(int *a, int size) {
+    printf("array[%d]: [", size);
+    int i;
+    for(i=0; i<size; i++) {
+        if(i==size-1) {
+            printf("%d", a[i]);
+            break;
+        }
+        printf("%d, ", a[i]);
+    }
+    printf("]\n");
+    return;
+}
+
+static void testing(void) {
+    printf("Testing: a simple job of bubblesort!\n");
+    int test[8];
+    int i, j=1;
+    for(i=0; i<8; i++) {
+        j *= 7;
+        test[i] = j%10;
+    }
+    printarray(test, 8);
+    for(i=7; i>=0; i--) {
+        for(j=0; j<i; j++) {
+            if(test[j]>test[j+1]) {
+                swap(&test[j], &test[j+1]);
+                printarray(test, 8);
+            }
+        }
+    }
+}
+
 /*
  * Reference:
  * Intel Software Developer's Manual Vol 3B "253669.pdf" August 2012
@@ -220,7 +260,7 @@ int main(void)
     /*printf("ref cycles:      %7lld\n\n", msr_stop[8].value);*/
     reset_counter(fd);
     start_counter(fd);
-    printf("printing a hex number for testing:0x%x\n", -1);
+    testing();
     stop_counter(fd);
     while(1) {
         a = read_counter(fd, select_event());
