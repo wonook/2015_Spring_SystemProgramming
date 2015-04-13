@@ -76,10 +76,10 @@ int start_counter (int file_desc, int event) {
 	};
 
 	struct MsrInOut msr_start2[] = {
-		{ MSR_WRITE, 0x186, 0x004101d0, 0x00 }, // ia32_perfevtsel0, MEM_UOPS_RETIRED.LOADS (19-29)
-	        { MSR_WRITE, 0x187, 0x004180d0, 0x00 }, // ia32_perfevtsel1, MEM_UOPS_RETIRED.ALL (19-29)
-	        { MSR_WRITE, 0x188, 0x01c140d0, 0x00 }, // ia32_perfevtsel2, UOPS_ISSUED.ANY-stalls (19-22)
-	        { MSR_WRITE, 0x189, 0x004180d0, 0x00 }, // ia32_perfevtsel3, RESOURCE_STALLS.ANY (19-27)
+		{ MSR_WRITE, 0x186, 0x004101d1, 0x00 }, // ia32_perfevtsel0, MEM_LOAD_UOPS_RETIRED.L1_HIT (19-29)
+	        { MSR_WRITE, 0x187, 0x004108d1, 0x00 }, // ia32_perfevtsel1, MEM_LOAD_UOPS_RETIRED.L1_MISS (19-29)
+	        { MSR_WRITE, 0x188, 0x01c102d1, 0x00 }, // ia32_perfevtsel2, MEM_LOAD_UOPS_RETIRED.L2_HIT (19-22)
+	        { MSR_WRITE, 0x189, 0x004110d1, 0x00 }, // ia32_perfevtsel3, MEM_LOAD_UOPS_RETIRED.L2_MISS (19-27)
 	        { MSR_WRITE, 0x38d, 0x222, 0x00 },      // ia32_perf_fixed_ctr_ctrl: ensure 3 FFCs enabled
 	        { MSR_WRITE, 0x38f, 0x0f, 0x07 },       // ia32_perf_global_ctrl: enable 4 PMCs & 3 FFCs
 	        { MSR_STOP, 0x00, 0x00 }
