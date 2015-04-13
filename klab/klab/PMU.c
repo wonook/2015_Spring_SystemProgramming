@@ -64,33 +64,44 @@ int select_event () {
 }
 
 int start_counter (int file_desc, int event) {
-	struct MsrInOut msr_start1[] = {
+/*	struct MsrInOut msr_start1[] = {
 		{ MSR_WRITE, 0x186, 0x004101c2, 0x00 }, // ia32_perfevtsel0, UOPS_RETIRED.ALL (19-28)
         	{ MSR_WRITE, 0x187, 0x0041010e, 0x00 }, // ia32_perfevtsel1, UOPS_ISSUED.ANY (19-22)
-//        	{ MSR_WRITE, 0x188, 0x01c1010e, 0x00 }, // ia32_perfevtsel2, UOPS_ISSUED.ANY-stalls (19-22)
   		{ MSR_WRITE, 0x188, 0x004102b1, 0x00 }, // ia32_perfevtsel2, UOPS_EXECUTED.CORE (19-28)
 		{ MSR_WRITE, 0x189, 0x004101a2, 0x00 }, // ia32_perfevtsel3, RESOURCE_STALLS.ANY (19-27)
         	{ MSR_WRITE, 0x38d, 0x222, 0x00 },      // ia32_perf_fixed_ctr_ctrl: ensure 3 FFCs enabled
        		{ MSR_WRITE, 0x38f, 0x0f, 0x07 },       // ia32_perf_global_ctrl: enable 4 PMCs & 3 FFCs
 	        { MSR_STOP, 0x00, 0x00 }
 	};
-
+*/
 	struct MsrInOut msr_start2[] = {
 		{ MSR_WRITE, 0x186, 0x004101d1, 0x00 }, // ia32_perfevtsel0, MEM_LOAD_UOPS_RETIRED.L1_HIT (19-29)
-	        { MSR_WRITE, 0x187, 0x004108d1, 0x00 }, // ia32_perfevtsel1, MEM_LOAD_UOPS_RETIRED.L1_MISS (19-29)
-	        { MSR_WRITE, 0x188, 0x01c102d1, 0x00 }, // ia32_perfevtsel2, MEM_LOAD_UOPS_RETIRED.L2_HIT (19-22)
-	        { MSR_WRITE, 0x189, 0x004110d1, 0x00 }, // ia32_perfevtsel3, MEM_LOAD_UOPS_RETIRED.L2_MISS (19-27)
+	        { MSR_WRITE, 0x187, 0x004108d1, 0x00 }, // ia32_perfevtsel1, MEM_LOAD_UOPS_RETIRED.L1_MISS(19-29)
+//	        { MSR_WRITE, 0x188, 0x01c102d1, 0x00 }, // ia32_perfevtsel2, MEM_LOAD_UOPS_RETIRED.L2_HIT (19-29)
+		{ MSR_WRITE, 0x188, 0x004102d1, 0x00 },
+		{ MSR_WRITE, 0x189, 0x004110d1, 0x00 }, // ia32_perfevtsel3, MEM_LOAD_UOPS_RETIRED.L2_MISS(19-29)
 	        { MSR_WRITE, 0x38d, 0x222, 0x00 },      // ia32_perf_fixed_ctr_ctrl: ensure 3 FFCs enabled
 	        { MSR_WRITE, 0x38f, 0x0f, 0x07 },       // ia32_perf_global_ctrl: enable 4 PMCs & 3 FFCs
 	        { MSR_STOP, 0x00, 0x00 }
 	};
 
+        struct MsrInOut msr_start1[] = { 
+	        { MSR_WRITE, 0x186, 0x00418108, 0x00 }, // ia32_perfevtsel0, DTLB_LOAD_MISSES.MISS_CAUSES_A_WALK (19-22)
+	        { MSR_WRITE, 0x187, 0x00418208, 0x00 }, // ia32_perfevtsel1, DTLB_LOAD_MISSES.MISS_COMPLETED (19-22)
+	        { MSR_WRITE, 0x188, 0x00410149, 0x00 }, // ia32_perfevtsel2, DTLB_STORE_MISSES.MISS_CAUSES_A_WALK (19-24)
+	        { MSR_WRITE, 0x189, 0x00410249, 0x00 }, // ia32_perfevtsel3, DTLB_STORE_MISSES.MISS_COMPLETED (19-24)
+	        { MSR_WRITE, 0x38d, 0x222, 0x00 },      // ia32_perf_fixed_ctr_ctrl: ensure 3 FFCs enabled
+	        { MSR_WRITE, 0x38f, 0x0f, 0x07 },       // ia32_perf_global_ctrl: enable 4 PMCs & 3 FFCs
+	        { MSR_STOP, 0x00, 0x00 }
+	};
+
+
 	printf ("Starting PMU counter...");
 	switch (event) {
-	case 1: // uops retired, issued, resource, ...
+	case 1: // DTLB load & store misses
 		ioctl (file_desc, IOCTL_MSR_CMDS, (long long)msr_start1);
 		break;
-	case 2: // MEM
+	case 2: // memory retired uops with cache hit or miss
 		ioctl (file_desc, IOCTL_MSR_CMDS, (long long)msr_start2);
 		break;
 	default :
@@ -121,17 +132,17 @@ int read_counter (int file_desc, int event) {
 
 	printf ("Printing general purpose function couter\n");
 	switch (event) {
-	case 1: // uops retired, issued, resource, ...
-		printf ("uops retired:    %7lld\n", msr_read[0].value);
-                printf ("uops issued:     %7lld\n", msr_read[1].value);
-                printf ("stalled cycles:  %7lld\n", msr_read[2].value);
-	        printf ("resource stalls: %7lld\n", msr_read[3].value);
+	case 1: // DTLB load & store misses
+		printf ("uops retired:         %7lld\n", msr_read[0].value);
+                printf ("uops issued:          %7lld\n", msr_read[1].value);
+                printf ("uops executed / core: %7lld\n", msr_read[2].value);
+	        printf ("resource stalls:      %7lld\n", msr_read[3].value);
 		break;
-	case 2: // MEM
-	        printf ("Retired memory uops that are loads:    %7lld\n", msr_read[0].value);
-	        printf ("Any retired memory uops:               %7lld\n", msr_read[1].value);
-	        printf ("stalled cycles:  %7lld\n", msr_read[2].value);
-	        printf ("resource stalls: %7lld\n", msr_read[3].value);
+	case 2: // MEM_LOAD_UOPS_RETIRED with cache hit | miss
+	        printf ("Retired uops L1 hit:  %7lld\n", msr_read[0].value);
+	        printf ("Retired uops L1 miss: %7lld\n", msr_read[1].value);
+	        printf ("Retired uops L2 hit:  %7lld\n", msr_read[2].value);
+	        printf ("Retired uops L2 miss: %7lld\n", msr_read[3].value);
 		break;
 	default:
 		printf ("Incorrect event selected. \n");
@@ -139,9 +150,9 @@ int read_counter (int file_desc, int event) {
 	}
 	
 	printf ("Printing fixed purpose function counter\n");
-        printf ("instr retired:   %7lld\n", msr_read[4].value);
-        printf ("core cycles:     %7lld\n", msr_read[5].value);
-        printf ("ref cycles:      %7lld\n", msr_read[6].value);
+        printf ("instr retired:        %7lld\n", msr_read[4].value);
+        printf ("core cycles:          %7lld\n", msr_read[5].value);
+        printf ("ref cycles:           %7lld\n", msr_read[6].value);
 	
 	return 0;
 }
@@ -211,8 +222,8 @@ int main (void) {
 	printf ("You have some options to select the general purpose function counter event!\n");
 	printf ("Fixed function counter and TSC's values will be given together always.\n");
         printf ("0: exit. \n");
-        printf ("1: uops retired...init\n");
-	printf ("2: MEM stuff\n");
+        printf ("1: DTLB load & store misses\n");
+	printf ("2: Retired load uops with cache hit or miss\n");
 
 	while (1){
 		if (0 == (event = select_event())) break;
