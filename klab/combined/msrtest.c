@@ -250,7 +250,17 @@ int main(void)
     /*printf("instr retired:   %7lld\n", msr_stop[6].value);*/
     /*printf("core cycles:     %7lld\n", msr_stop[7].value);*/
     /*printf("ref cycles:      %7lld\n\n", msr_stop[8].value);*/
-    printf("the counter is in its initial state:");
+    printf("the counter is in its initial state:\n");
+
+    printf ("You'll be able to select a PMU event to monitor");
+    printf ("(0.continue/ 1.uops retired/");
+    printf ("2.uops issued/ ");
+    printf ("3.stalled cycles/ ");
+    printf ("4.resource stalls/ ");
+    printf ("5.instr retired/ ");
+    printf ("6.core cycles/ ");
+    printf ("7.ref cycles)\n");
+
     while(1) {
         a = read_counter(fd, select_event());
         if(a<0) break;
@@ -261,8 +271,8 @@ int main(void)
     start_counter(fd);
     testing();
     stop_counter(fd);
-
-    printf ("Please select a PMU event to monitor");
+    
+    printf ("You'll be able to select a PMU event to monitor");
     printf ("(0.continue/ 1.uops retired/");
     printf ("2.uops issued/ ");
     printf ("3.stalled cycles/ ");
