@@ -1,3 +1,7 @@
+/*
+ * Reference : Intel 64 and IA-32 Architectures Software Developer's Manual.
+ */
+
 #include "msrdrv.h"
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -52,33 +56,55 @@ int select_event () {
 	while (1){
 		printf ("Type your event: ");
 		scanf ("%d",&event);
-		if ((0<=event)&&(event<=8)) break;
+		if ((0<=event)&&(event<=2)) break;
 		else printf ("Incorrect input!\n");
 	}
 
 	return event;
 }
 
-void start_counter (int file_desc) {
-	struct MsrInOut msr_start[] = {
-		{ MSR_WRITE, 0x186, 0x004101c2, 0x00 }, // ia32_perfevtsel1, UOPS_RETIRED.ALL (19-28)
-        	{ MSR_WRITE, 0x187, 0x0041010e, 0x00 }, // ia32_perfevtsel0, UOPS_ISSUED.ANY (19.22)
-        	{ MSR_WRITE, 0x188, 0x01c1010e, 0x00 }, // ia32_perfevtsel2, UOPS_ISSUED.ANY-stalls (19-22)
-       		{ MSR_WRITE, 0x189, 0x004101a2, 0x00 }, // ia32_perfevtsel3, RESOURCE_STALLS.ANY (19-27)
+int start_counter (int file_desc, int event) {
+	struct MsrInOut msr_start1[] = {
+		{ MSR_WRITE, 0x186, 0x004101c2, 0x00 }, // ia32_perfevtsel0, UOPS_RETIRED.ALL (19-28)
+        	{ MSR_WRITE, 0x187, 0x0041010e, 0x00 }, // ia32_perfevtsel1, UOPS_ISSUED.ANY (19-22)
+//        	{ MSR_WRITE, 0x188, 0x01c1010e, 0x00 }, // ia32_perfevtsel2, UOPS_ISSUED.ANY-stalls (19-22)
+  		{ MSR_WRITE, 0x188, 0x004102b1, 0x00 }, // ia32_perfevtsel2, UOPS_EXECUTED.CORE (19-28)
+		{ MSR_WRITE, 0x189, 0x004101a2, 0x00 }, // ia32_perfevtsel3, RESOURCE_STALLS.ANY (19-27)
         	{ MSR_WRITE, 0x38d, 0x222, 0x00 },      // ia32_perf_fixed_ctr_ctrl: ensure 3 FFCs enabled
        		{ MSR_WRITE, 0x38f, 0x0f, 0x07 },       // ia32_perf_global_ctrl: enable 4 PMCs & 3 FFCs
 	        { MSR_STOP, 0x00, 0x00 }
 	};
 
+	struct MsrInOut msr_start2[] = {
+		{ MSR_WRITE, 0x186, 0x004101d0, 0x00 }, // ia32_perfevtsel0, MEM_UOPS_RETIRED.LOADS (19-29)
+	        { MSR_WRITE, 0x187, 0x004180d0, 0x00 }, // ia32_perfevtsel1, MEM_UOPS_RETIRED.ALL (19-29)
+	        { MSR_WRITE, 0x188, 0x01c140d0, 0x00 }, // ia32_perfevtsel2, UOPS_ISSUED.ANY-stalls (19-22)
+	        { MSR_WRITE, 0x189, 0x004180d0, 0x00 }, // ia32_perfevtsel3, RESOURCE_STALLS.ANY (19-27)
+	        { MSR_WRITE, 0x38d, 0x222, 0x00 },      // ia32_perf_fixed_ctr_ctrl: ensure 3 FFCs enabled
+	        { MSR_WRITE, 0x38f, 0x0f, 0x07 },       // ia32_perf_global_ctrl: enable 4 PMCs & 3 FFCs
+	        { MSR_STOP, 0x00, 0x00 }
+	};
+
 	printf ("Starting PMU counter...");
-        ioctl (file_desc, IOCTL_MSR_CMDS, (long long)msr_start);
+	switch (event) {
+	case 1: // uops retired, issued, resource, ...
+		ioctl (file_desc, IOCTL_MSR_CMDS, (long long)msr_start1);
+		break;
+	case 2: // MEM
+		ioctl (file_desc, IOCTL_MSR_CMDS, (long long)msr_start2);
+		break;
+	default :
+		printf ("Incorrect event at starting counter\n");
+		return -1;
+	}
+
 	printf ("Done! \n");
 
-	return ;
+	return 0;
 }
 
 int read_counter (int file_desc, int event) {
-	struct MsrInOut msr_read[] = {
+    	struct MsrInOut msr_read[] = {
         	{ MSR_READ, 0xc1, 0x00 },               // ia32_pmc0: read value (35-5)
         	{ MSR_READ, 0xc2, 0x00 },               // ia32_pmc1: read value (35-5)
         	{ MSR_READ, 0xc3, 0x00 },               // ia32_pmc2: read value (35-5)
@@ -93,33 +119,29 @@ int read_counter (int file_desc, int event) {
         ioctl (file_desc, IOCTL_MSR_CMDS, (long long)msr_read);
         printf ("Done!\n");
 
+	printf ("Printing general purpose function couter\n");
 	switch (event) {
-	case 8: // all
-	case 1: // uops retired
+	case 1: // uops retired, issued, resource, ...
 		printf ("uops retired:    %7lld\n", msr_read[0].value);
-		if (event != 8) break;
-	case 2: // uops issued
                 printf ("uops issued:     %7lld\n", msr_read[1].value);
-                if (event != 8) break;
-	case 3: // stalled cycles
                 printf ("stalled cycles:  %7lld\n", msr_read[2].value);
-		if (event != 8) break;
-	case 4: // resource stalls
 	        printf ("resource stalls: %7lld\n", msr_read[3].value);
-		if (event != 8) break;
-	case 5: // instr retired
-                printf ("instr retired:   %7lld\n", msr_read[4].value);
-		if (event != 8) break;
-	case 6: // core cycles
-                printf ("core cycles:     %7lld\n", msr_read[5].value);
-		if (event != 8) break;
-	case 7: // ref cycles
-                printf ("ref cycles:      %7lld\n", msr_read[6].value);
+		break;
+	case 2: // MEM
+	        printf ("Retired memory uops that are loads:    %7lld\n", msr_read[0].value);
+	        printf ("Any retired memory uops:               %7lld\n", msr_read[1].value);
+	        printf ("stalled cycles:  %7lld\n", msr_read[2].value);
+	        printf ("resource stalls: %7lld\n", msr_read[3].value);
 		break;
 	default:
-		printf ("Incorrect event selected.\n");
+		printf ("Incorrect event selected. \n");
 		return -1;
 	}
+	
+	printf ("Printing fixed purpose function counter\n");
+        printf ("instr retired:   %7lld\n", msr_read[4].value);
+        printf ("core cycles:     %7lld\n", msr_read[5].value);
+        printf ("ref cycles:      %7lld\n", msr_read[6].value);
 	
 	return 0;
 }
@@ -185,24 +207,19 @@ int main (void) {
 
 	int event, err_check;
 	printf ("Hello! this is PMU counter. ");
-	printf ("We would do some bubble sort. ");
-	printf ("These are options you can choice!\n");
+	printf ("We would do some bubble sort.\n");
+	printf ("You have some options to select the general purpose function counter event!\n");
+	printf ("Fixed function counter and TSC's values will be given together always.\n");
         printf ("0: exit. \n");
-        printf ("1: uops retired.\n");
-        printf ("2: uops issued.\n");
-        printf ("3. stalled cycles.\n");
-        printf ("4. resource stalls.\n");
-        printf ("5. instr retired.\n");
-        printf ("6. core cycles.\n");
-        printf ("7. ref cycles.\n");
-        printf ("8. all.\n");
+        printf ("1: uops retired...init\n");
+	printf ("2: MEM stuff\n");
 
 	while (1){
 		if (0 == (event = select_event())) break;
 	    	reset_counter (file_desc);
 		if (0 > (err_check = read_counter (file_desc, event))) break;
 		read_tsc (file_desc);
-		start_counter (file_desc);
+		if (0 > (err_check = start_counter (file_desc, event))) break;
 		testing();
 		stop_counter(file_desc);
 		if (0 > (err_check = read_counter (file_desc, event))) break;
