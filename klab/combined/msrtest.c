@@ -35,16 +35,8 @@ void reset_counter (int fd) {
 int select_event () {
     int event;
 
-    printf ("Please select a PMU event to monitor");
-    printf ("(0.continue/ 1.uops retired/");
-    printf ("2.uops issued/ ");
-    printf ("3.stalled cycles/ ");
-    printf ("4.resource stalls/ ");
-    printf ("5.instr retired/ ");
-    printf ("6.core cycles/ ");
-    printf ("7.ref cycles)\nSelection:");
-
     while (1){
+        printf("Select an event:");
         scanf ("%d", &event);
         if ((0<=event)&&(event<8)) break;
         else printf ("Incorrect input!\nTry again:");
@@ -269,6 +261,16 @@ int main(void)
     start_counter(fd);
     testing();
     stop_counter(fd);
+
+    printf ("Please select a PMU event to monitor");
+    printf ("(0.continue/ 1.uops retired/");
+    printf ("2.uops issued/ ");
+    printf ("3.stalled cycles/ ");
+    printf ("4.resource stalls/ ");
+    printf ("5.instr retired/ ");
+    printf ("6.core cycles/ ");
+    printf ("7.ref cycles)\n");
+
     while(1) {
         a = read_counter(fd, select_event());
         if(a<0) break;
