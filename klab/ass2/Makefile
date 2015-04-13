@@ -20,6 +20,6 @@ run2:
 	sudo ./PMU
 
 clean:
-	rm -f leaf0ah PMU *.ko *.o *.so *.order *.symvers
+	rm -f leaf0ah PMU *.ko *.o *.so *.order *.symvers *.mod.*
 	sudo rmmod msrdrv
 	sudo rm /dev/msrdrv
