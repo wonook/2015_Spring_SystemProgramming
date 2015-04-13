@@ -23,7 +23,8 @@ run2:
 	sudo ./PMU
 
 clean:
-	rm -f tree PMU *.ko *.o *.so *.order *.symvers *.mod.*
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+	rm -f tree PMU
 	sudo rmmod chardev
 	sudo rmmod msrdrv
 	sudo rm /dev/chardev

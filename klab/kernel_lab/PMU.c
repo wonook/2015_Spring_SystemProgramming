@@ -17,7 +17,7 @@ void stop_counter (int file_desc) {
 
 	printf ("Stopping PMU counter...");
 	ioctl (file_desc, IOCTL_MSR_CMDS, (long long)msr_stop);
-	printf ("Done!\n");
+	printf ("Done! ");
 
 	return ;
 }
@@ -39,7 +39,7 @@ void reset_counter (int file_desc) {
 	stop_counter (file_desc);
 	printf ("Reseting PMU counter...");
         ioctl (file_desc, IOCTL_MSR_CMDS, (long long)msr_reset);
-	printf ("Done!\n");
+	printf ("Done! ");
 
 	return ;
 }
@@ -50,7 +50,7 @@ int select_event () {
 	printf ("Please select PMU event to monitor!\n");
 
 	while (1){
-		printf ("Type yout event: ");
+		printf ("Type your event: ");
 		scanf ("%d",&event);
 		if ((0<=event)&&(event<=8)) break;
 		else printf ("Incorrect input!\n");
@@ -72,7 +72,7 @@ void start_counter (int file_desc) {
 
 	printf ("Starting PMU counter...");
         ioctl (file_desc, IOCTL_MSR_CMDS, (long long)msr_start);
-	printf ("Done!\n");
+	printf ("Done! ");
 
 	return ;
 }
@@ -88,7 +88,7 @@ int read_counter (int file_desc, int event) {
         	{ MSR_READ, 0x30b, 0x00 },              // ia32_fixed_ctr2: read value (35-17)
         	{ MSR_STOP, 0x00, 0x00 }
     	};
-
+	
 	printf ("Reading PMU counter...");
         ioctl (file_desc, IOCTL_MSR_CMDS, (long long)msr_read);
         printf ("Done!\n");
@@ -130,13 +130,50 @@ void read_tsc (int file_desc){
 		{ MSR_STOP, 0x00, 0x00 },
 	};
 
-	printf ("Reading TSC...");
 	ioctl (file_desc, IOCTL_MSR_CMDS, (long long)msr_readtsc);
-	printf ("Done!\n");
 
 	printf ("TSC: %7lld\n", msr_readtsc[0].value);
 
 	return ;
+}
+
+static void swap(int *a, int *b) {
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
+    return;
+}
+
+static void printarray(int *a, int size) {
+    printf("array[%d]: [", size);
+    int i;
+    for(i=0; i<size; i++) {
+        if(i==size-1) {
+            printf("%d", a[i]);
+            break;
+        }
+        printf("%d, ", a[i]);
+    }
+    printf("]\n");
+    return;
+}
+
+static void testing(void) {
+    int test[8];
+    int i, j=1;
+    for(i=0; i<8; i++) {
+        j *= 7;
+        test[i] = j%10;
+    }
+    printarray(test, 8);
+    for(i=7; i>=0; i--) {
+        for(j=0; j<i; j++) {
+            if(test[j]>test[j+1]) {
+                swap(&test[j], &test[j+1]);
+                printarray(test, 8);
+            }
+        }
+    }
 }
 
 int main (void) {
@@ -147,8 +184,9 @@ int main (void) {
 	}
 
 	int event, err_check;
-	printf ("Hello! this is PMU counter.\n");
-        printf ("These are options you can choice!\n");
+	printf ("Hello! this is PMU counter. ");
+	printf ("We would do some bubble sort. ");
+	printf ("These are options you can choice!\n");
         printf ("0: exit. \n");
         printf ("1: uops retired.\n");
         printf ("2: uops issued.\n");
@@ -164,6 +202,11 @@ int main (void) {
 	    	reset_counter(file_desc);
 		start_counter(file_desc);
 		if (0 > (err_check = read_counter (file_desc, event))) break;
+		read_tsc (file_desc);
+		testing();
+		stop_counter(file_desc);
+		if (0 > (err_check = read_counter (file_desc, event))) break;
+		read_tsc (file_desc);
 	}
 	
 	file_desc = close(file_desc);

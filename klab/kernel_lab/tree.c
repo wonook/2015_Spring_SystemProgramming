@@ -46,7 +46,7 @@ int main()
 	int file_desc;
 
 	file_desc = open("/dev/chardev", O_RDWR);
-        printf("the open funciont's result is: %d\n", file_desc);
+        printf("Opening device file: %d\n", file_desc);
 	if (file_desc < 0) {
 		printf ("Can't open device file: %s\n", DEVICE_FILE_NAME);
 		exit (-1);
