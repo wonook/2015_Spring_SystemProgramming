@@ -72,7 +72,7 @@ void start_counter (int file_desc) {
 
 	printf ("Starting PMU counter...");
         ioctl (file_desc, IOCTL_MSR_CMDS, (long long)msr_start);
-	printf ("Done! ");
+	printf ("Done! \n");
 
 	return ;
 }
@@ -199,10 +199,10 @@ int main (void) {
 
 	while (1){
 		if (0 == (event = select_event())) break;
-	    	reset_counter(file_desc);
-		start_counter(file_desc);
+	    	reset_counter (file_desc);
 		if (0 > (err_check = read_counter (file_desc, event))) break;
 		read_tsc (file_desc);
+		start_counter (file_desc);
 		testing();
 		stop_counter(file_desc);
 		if (0 > (err_check = read_counter (file_desc, event))) break;
