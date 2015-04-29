@@ -1,0 +1,33 @@
+3. 
+
+mm.c만 고친다
+
+(mm init), mm malloc, mm free만 고치면 된다
+mm realloc은 구현 안해도 됨.
+
+make하면 mdriver을 ./mdriver -v으로 주면 몇점인지 나옴.
+
+alloc, free하는 시나리오가 담겨있는 파일 = random-bal.rep
+
+시작~끝 에 관한 내용은 우선 보류.
+
+4. 
+
+checker 의 내용은 당연한 것들. 체크 하고 구현하자.
+
+매번 할 때 진짜 check하면 느려지기 때문에 save 해서 binary에서 mm_check를 빼자.
+
+6.
+
+이것 처럼 체크하면 된다
+
+8.
+
+어떻게 실제로 평가하는지
+
+9.
+
+위 부분 다 구현해서 시간이 남으면 하는거
+library interpositioning(건너 뛰게 하는 거)을 적용해서 malloc을 했다 안했다 등 print하는거 말고 error reporting library 를 구현.
+
+
