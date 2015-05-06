@@ -31,3 +31,29 @@ checker 의 내용은 당연한 것들. 체크 하고 구현하자.
 library interpositioning(건너 뛰게 하는 거)을 적용해서 malloc을 했다 안했다 등 print하는거 말고 error reporting library 를 구현.
 
 
+extra credit
+
+gcc -O2 -Wall -shared -fPIC -o mymalloc.so ...
+...
+...
+
+
+make run 하면LD_PRELOAD = "./mymalloc.so" ./hello
+ERROR : you jst tried to free freed or unallocated heap!
+Dynamic Memory Checker freed automaticaly unfreed heap area [addr]
+x4
+
+
+
+mdrive가 제일 큰 놈. 메인
+
+valid(memory leak) -> speed
+
+
+config check_double free ?
+a 1 2040
+f 1
+f 1 에서 체크해서 abort되어야 함
+
+double free도 뜨면 abort시켜야함
+
