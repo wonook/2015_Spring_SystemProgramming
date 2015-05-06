@@ -37,12 +37,13 @@
  * The key compound data types 
  *****************************/
 
-/* Records the extent of each block's payload */
+/* Records the extent of each block's payload 
 typedef struct range_t {
-  char *lo;              /* low payload address */
-  char *hi;              /* high payload address */
-  struct range_t *next;  /* next list element */
+  char *lo;              // low payload address
+  char *hi;              // high payload address
+  struct range_t *next;  // next list element
 } range_t;
+*/
 
 /* Characterizes a single trace operation (allocator request) */
 typedef struct {
@@ -435,12 +436,10 @@ static void remove_range(range_t **ranges, char *lo)
 {
   range_t *p;
   range_t **prevpp = ranges;
-  int size;
 
   for (p = *ranges;  p != NULL; p = p->next) {
     if (p->lo == lo) {
       *prevpp = p->next;
-      size = p->hi - p->lo + 1;
       free(p);
       break;
     }
@@ -600,7 +599,7 @@ static int eval_mm_valid(trace_t *trace, int tracenum, range_t **ranges)
   clear_ranges(ranges);
 
   /* Call the mm package's init function */
-  if (mm_init() < 0) {
+  if (mm_init(ranges) < 0) {
     malloc_error(tracenum, 0, "mm_init failed.");
     return 0;
   }
@@ -681,7 +680,7 @@ static int eval_mm_valid(trace_t *trace, int tracenum, range_t **ranges)
 
         /* Remove region from list and call student's free function */
         p = trace->blocks[index];
-        remove_range(ranges, p);
+        //remove_range(ranges, p); - no need, because mm_free call it automatically.
         mm_free(p);
         break;
 
@@ -690,7 +689,18 @@ static int eval_mm_valid(trace_t *trace, int tracenum, range_t **ranges)
     }
 
   }
+  
+  /* Call the mm package's exit function */
+  mm_exit();
 
+  /* 
+   * Test memory leak problem.
+   */
+  if (*ranges) {
+    malloc_error(tracenum, i, "mm_exit did not treat the memory leak");
+    return 0;
+  }
+  
   /* As far as we know, this is a valid malloc package */
   return 1;
 }
@@ -718,7 +728,7 @@ static double eval_mm_util(trace_t *trace, int tracenum, range_t **ranges)
 
   /* initialize the heap and the mm malloc package */
   mem_reset_brk();
-  if (mm_init() < 0)
+  if (mm_init(NULL) < 0)
     app_error("mm_init failed in eval_mm_util");
 
   for (i = 0;  i < trace->num_ops;  i++) {
@@ -801,7 +811,7 @@ static void eval_mm_speed(void *ptr)
 
   /* Reset the heap and initialize the mm package */
   mem_reset_brk();
-  if (mm_init() < 0) 
+  if (mm_init(NULL) < 0) 
     app_error("mm_init failed in eval_mm_speed");
 
   /* Interpret each trace request */

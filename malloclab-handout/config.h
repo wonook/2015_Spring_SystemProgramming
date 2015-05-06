@@ -21,7 +21,14 @@
  * your students to implement realloc, you can delete the last two
  * traces.
  */
+
+#define CHECK_DOUBLE_FREE 0
+
+#if CHECK_DOUBLE_FREE
+#define DEFAULT_TRACEFILES "double-free.rep"
+#else
 #define DEFAULT_TRACEFILES \
+  "memory-leak.rep",\
   "short1-bal.rep",\
   "short2-bal.rep",\
   "random-bal.rep",\
@@ -36,6 +43,7 @@
   "cp-decl-bal.rep",\
   "expr-bal.rep",\
   "coalescing-bal.rep"
+#endif
 
 /*
  * This constant gives the estimated performance of the libc malloc

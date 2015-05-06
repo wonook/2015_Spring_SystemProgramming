@@ -35,6 +35,9 @@ team_t team = {
   ""
 };
 
+/* DON'T MODIFY THIS VALUE AND LEAVE IT AS IT WAS */
+static range_t **gl_ranges;
+
 /* single word (4) or double word (8) alignment */
 #define ALIGNMENT 8
 
@@ -44,11 +47,39 @@ team_t team = {
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
+/* 
+ * remove_range - manipulate range lists
+ * DON'T MODIFY THIS FUNCTION AND LEAVE IT AS IT WAS
+ */
+static void remove_range(range_t **ranges, char *lo)
+{
+  range_t *p;
+  range_t **prevpp = ranges;
+  
+  if (!ranges)
+    return;
+
+  for (p = *ranges;  p != NULL; p = p->next) {
+    if (p->lo == lo) {
+      *prevpp = p->next;
+      free(p);
+      break;
+    }
+    prevpp = &(p->next);
+  }
+}
+
 /*
  * mm_init - initialize the malloc package.
  */
-int mm_init(void)
+int mm_init(range_t **ranges)
 {
+  /* YOUR IMPLEMENTATION */
+
+
+  /* DON't MODIFY THIS STAGE AND LEAVE IT AS IT WAS */
+  gl_ranges = ranges;
+
   return 0;
 }
 
@@ -73,6 +104,12 @@ void* mm_malloc(size_t size)
  */
 void mm_free(void *ptr)
 {
+  /* YOUR IMPLEMENTATION */
+
+
+  /* DON't MODIFY THIS STAGE AND LEAVE IT AS IT WAS */
+  if (gl_ranges)
+    remove_range(gl_ranges, ptr);
 }
 
 /*
@@ -82,3 +119,11 @@ void* mm_realloc(void *ptr, size_t t)
 {
   return NULL;
 }
+
+/*
+ * mm_exit - finalize the malloc package.
+ */
+void mm_exit(void)
+{
+}
+
