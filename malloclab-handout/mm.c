@@ -70,6 +70,13 @@ static void remove_range(range_t **ranges, char *lo)
 }
 
 /*
+ * mm_check - checks heap consistency
+ */
+int mm_check(void) {
+  
+}
+
+/*
  * mm_init - initialize the malloc package.
  */
 int mm_init(range_t **ranges)
