@@ -24,11 +24,11 @@
  ********************************************************/
 team_t team = {
   /* Team name : Your student ID */
-  "2015-00000",
+  "2013-11406",
   /* Your full name */
-  "FirstName LastName",
+  "Won Wook SONG",
   /* Your student ID */
-  "2015-00000",
+  "2013-11406",
   /* leave blank */
   "",
   /* leave blank */
