@@ -44,8 +44,52 @@ static range_t **gl_ranges;
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 
-
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
+
+/* FUNCTIONS FROM THE BOOK */
+#define WSIZE 4 // Single wods zie in bytes
+#define DSIZE 8 // Double word size in bytes
+#define CHUNKSIZE (1<<12) //extend the heap by this amount
+
+#define MAX(x, y)   ((x) > (y) ? (x) : (y))
+
+/* Pack a size and allocated bit into a word (for header/footer) */
+#define PACK(size, alloc)   ((size)|(alloc))
+
+/* Read and write a word at address p */
+#define GET(p)      (*(unsigned int *)(p))
+#define PUT(p, val) (*(unsigned int *)(p) = (val))
+
+/* Read the size and the allocated bit from address p (p must be header/footer) */
+#define GET_SIZE(p) (GET(p) & ~0x7)
+#define GET_ALLOC(p) (GET(p) & 0x1)
+
+/* Given block ptr bp, compute address of its header and footer */
+#define HDRP(bp)    ((char *)(bp) - WSIZE)
+#define FTRP(bp)    ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
+
+/* Given block ptr bp, compute address of its next and previous blocks */
+#define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE((HDRP(bp))))
+#define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
+
+static char *heap_listp;
+
+
+/* OWN FUNCTIONS */
+#define BLK_SIZE(bp) (GET_SIZE(HDRP(bp)))
+
+int mm_init(range_t **ranges);
+void* mm_malloc(size_t size);
+void mm_free(void *ptr);
+void* mm_realloc(void *ptr, size_t t);
+void mm_exit(void);
+
+
+int mm_check(void);
+void *extend_heap(size_t words);
+static void *coalesce(void *bp);
+
+
 
 /* 
  * remove_range - manipulate range lists
@@ -70,19 +114,24 @@ static void remove_range(range_t **ranges, char *lo)
 }
 
 /*
- * mm_check - checks heap consistency
- */
-int mm_check(void) {
-  
-}
-
-/*
  * mm_init - initialize the malloc package.
  */
 int mm_init(range_t **ranges)
 {
   /* YOUR IMPLEMENTATION */
 
+  /* Create the initial empty heap */
+  if ((heap_listp = mem_sbrk(4*WSIZE)) == (void *)-1)
+    return -1;
+  PUT(heap_listp, 0);
+  PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1));
+  PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1));
+  PUT(heap_listp + (3*WSIZE), PACK(0, 1));
+  heap_listp += (2*WSIZE); // Middle of prologue block
+
+  /* Extend the empty heap with a free block of CHUNKSIZE bytes */
+  if (extend_heap(CHUNKSIZE/WSIZE) == NULL)
+    return -1;
 
   /* DON't MODIFY THIS STAGE AND LEAVE IT AS IT WAS */
   gl_ranges = ranges;
@@ -112,7 +161,11 @@ void* mm_malloc(size_t size)
 void mm_free(void *ptr)
 {
   /* YOUR IMPLEMENTATION */
+  size_t size = GET_SIZE(HDRP(ptr));
 
+  PUT(HDRP(ptr), PACK(size, 0));
+  PUT(FTRP(ptr), PACK(size, 0));
+  coalesce(ptr);
 
   /* DON't MODIFY THIS STAGE AND LEAVE IT AS IT WAS */
   if (gl_ranges)
@@ -133,4 +186,69 @@ void* mm_realloc(void *ptr, size_t t)
 void mm_exit(void)
 {
 }
+
+/* EXTRA FUNCTIONS */
+/*
+ * mm_check - checks heap consistency
+ */
+int mm_check(void) {
+  
+}
+
+/*
+ * extend_heap - extends the heap
+ */
+void *extend_heap(size_t words) {
+  char *bp;
+  size_t size;
+
+  /* Allocate an even number of words to maintain alignment */
+  size = (words % 2) ? (words+1)*WSIZE : words*WSIZE;
+  if((long)(bp = mem_sbrk(size)) == -1)
+    return NULL;
+
+  /* Initialize free block header/footre and the epilogue header */
+  PUT(HDRP(bp), PACK(size, 0)); // Free block header
+  PUT(FTRP(bp), PACK(size, 0)); // Free block footer
+  PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); //New epilogue header
+
+  /* Coalesce if the previous block was free */
+  return coalesce(bp);
+}
+
+/*
+ * coalesce - coalesces the block upon freeing
+ */
+static void *coalesce(void *bp) {
+  size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
+  size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+  size_t size = GET_SIZE(HDRP(bp));
+
+  if (prev_alloc && next_alloc) { // both not empty
+    return bp;
+  }
+
+  else if (prev_alloc && !next_alloc) { // next is empty
+    size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
+    PUT(HDRP(bp), PACK(size, 0));
+    PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+  }
+
+  else if (prev_alloc && next_alloc) { // prev is empty
+    size += GET_SIZE(HDRP(PREV_BLKP(bp)));
+    PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+    PUT(FTRP(bp), PACK(size, 0));
+    bp = PREV_BLKP(bp);
+  }
+
+  else { // both are empty
+    size += GET_SIZE(HDRP(PREV_BLKP(bp))) + GET_SIZE(FTRP(NEXT_BLKP(bp)));
+    PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+    PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+    bp = PREV_BLKP(bp);
+  }
+
+  return bp;
+}
+
 
