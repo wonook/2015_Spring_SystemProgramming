@@ -78,8 +78,8 @@ static char *heap_listp = 0;
 
 
 /* OWN FUNCTIONS */
-#define DEBUG //for debugging
-#define DEBUG_STATUS
+//#define DEBUG //for debugging
+//#define DEBUG_STATUS
 
 #define BLK_SIZE(bp) (GET_SIZE(HDRP(bp)))
 #define BLK_ALLOC(bp) (GET_ALLOC(HDRP(bp)))
@@ -108,9 +108,6 @@ static void place(void *bp, size_t asize);
  */
 static void remove_range(range_t **ranges, char *lo)
 {
-#ifdef DEBUG
-printf("| | remove_range BEGINDONE\n");
-#endif
   range_t *p;
   range_t **prevpp = ranges;
   
@@ -156,13 +153,12 @@ mm_check();
   /* DON't MODIFY THIS STAGE AND LEAVE IT AS IT WAS */
   gl_ranges = ranges;
 
-#ifdef DEBUG
-mm_check();
-#endif
 #ifdef DEBUG_STATUS
 printf("| init DONE\n");
 #endif
-
+#ifdef DEBUG
+mm_check();
+#endif
   return 0;
 }
 
@@ -175,15 +171,12 @@ void* mm_malloc(size_t size)
 #ifdef DEBUG_STATUS
 printf("| mm_malloc BEGIN\n");
 #endif
-#ifdef DEBUG
-mm_check();
-#endif
   size_t asize;
   size_t extendsize;
   char *bp;
 
-  if (heap_listp == 0) 
-    mm_init(NULL); // WARN: not sure if used correctly
+  //if (heap_listp == 0) 
+    //mm_init(NULL); // WARN: not sure if used correctly
 
   if (size == 0) return NULL;
 
@@ -196,7 +189,7 @@ printf("| | malloc - size: %zu, adjusted size: %zu \n", size, asize);
 
   if((bp = find_fit(asize)) != NULL) {
 #ifdef DEBUG
-printf("| | found fit block\n");
+printf("| | found fit block:%p\n", bp);
 #endif
     place(bp, asize);
 #ifdef DEBUG
@@ -221,11 +214,7 @@ void mm_free(void *ptr)
 {
   /* YOUR IMPLEMENTATION */
 #ifdef DEBUG_STATUS
-printf("| mm_free BEGIN\n");
-#endif
-#ifdef DEBUG
-mm_check();
-printf("| | free => ptr: %p\n", ptr);
+printf("| mm_free BEGIN at:%p\n", ptr);
 #endif
   size_t size = BLK_SIZE(ptr);
 
@@ -236,11 +225,11 @@ printf("| | free => ptr: %p\n", ptr);
   /* DON't MODIFY THIS STAGE AND LEAVE IT AS IT WAS */
   if (gl_ranges)
     remove_range(gl_ranges, ptr);
-#ifdef DEBUG
-mm_check();
-#endif
 #ifdef DEBUG_STATUS
 printf("| mm_free DONE\n");
+#endif
+#ifdef DEBUG
+mm_check();
 #endif
 }
 
@@ -262,9 +251,18 @@ printf("| !!mm_realloc BEGINDONE\n");
 void mm_exit(void)
 {
 #ifdef DEBUG_STATUS
-printf("| mm_exit BEGINDONE\n");
+printf("| mm_exit BEGIN\n");
 #endif
+  void *bp = heap_listp;
 
+  for(bp = NEXT_BLKP(bp); BLK_SIZE(bp) > 0; bp = NEXT_BLKP(bp)) {
+    if(BLK_ALLOC(bp)) mm_free(bp);
+  }
+#ifdef DEBUG
+printf("| mm_exit_DONE\n");
+mm_check();
+#endif
+  return;
 }
 
 /* ===============================EXTRA FUNCTIONS========================= */
@@ -285,18 +283,17 @@ void printheap(void) {
   printf("\tCURRENT HEAP: ");
   void *bp = 0;
   size_t size;
-  char r;
 
   for(bp = heap_listp; BLK_SIZE(bp) > 0; bp = NEXT_BLKP(bp)) {
     size = (BLK_SIZE(bp));
     printf("|%7zu%2c |", size, BLK_ALLOC_CHAR(bp));
   }
-  printf("\n\t\t      ");
+  size = (BLK_SIZE(bp));
+  printf("|%7zu%2c |\n\t              ", size, BLK_ALLOC_CHAR(bp));
   for(bp = heap_listp; BLK_SIZE(bp) > 0; bp = NEXT_BLKP(bp)) {
     printf("|%p|", bp);
   }
- 
-  printf("\n");
+  printf("|%p|\n", bp);
   return;
 }
 
@@ -306,8 +303,7 @@ void printheap(void) {
  */
 static void *extend_heap(size_t words) {
 #ifdef DEBUG
-printf("| | extend_heap BEGIN\n");
-mm_check();
+printf("| | extend_heap BEGIN size:%zu\n", words);
 #endif
 
   char *bp;
@@ -325,8 +321,8 @@ mm_check();
 
   bp = coalesce(bp);
 #ifdef DEBUG
-mm_check();
 printf("| | extend_heap DONE\n");
+mm_check();
 #endif
   /* Coalesce if the previous block was free */
   return bp;
@@ -337,8 +333,9 @@ printf("| | extend_heap DONE\n");
  */
 static void *coalesce(void *bp) {
 #ifdef DEBUG
-printf("| | coalesce BEGIN\n");
-printf("| | | prev_blkp:%p:%c, next_blkp: %p:%c\n", PREV_BLKP(bp), BLK_ALLOC_CHAR(PREV_BLKP(bp)), NEXT_BLKP(bp), BLK_ALLOC_CHAR(NEXT_BLKP(bp)));
+printf("debug coalesce: %p\n", PREV_BLKP(bp));
+printf("| | coalesce Called ");
+printf("| prev_blkp:%p:%c, next_blkp: %p:%c\n", PREV_BLKP(bp), BLK_ALLOC_CHAR(PREV_BLKP(bp)), NEXT_BLKP(bp), BLK_ALLOC_CHAR(NEXT_BLKP(bp)));
 #endif
   size_t prev_alloc = BLK_ALLOC(PREV_BLKP(bp));
   size_t next_alloc = BLK_ALLOC(NEXT_BLKP(bp));
@@ -357,8 +354,8 @@ printf("| | coalesce DONE\n");
 printf("| | | next is empty\n");
 #endif
     size += BLK_SIZE(NEXT_BLKP(bp));
-    PUT(HDRP(bp), PACK(size, 0));
-    PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+    PUT(HDRP(bp), PACK(size, 0)); //| A |<-bp|   |
+    PUT(FTRP(bp), PACK(size, 0)); //| A | bp | ->|  size is already implemented in HDRP so no need to NEXT_BLKP.
   }
 
   else if (!prev_alloc && next_alloc) { // prev is empty
@@ -366,8 +363,8 @@ printf("| | | next is empty\n");
 printf("| | | prev is empty\n");
 #endif
     size += BLK_SIZE(PREV_BLKP(bp));
-    PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-    PUT(FTRP(bp), PACK(size, 0));
+    PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));  //|<- | bp | A |
+    PUT(FTRP(bp), PACK(size, 0));             //|<- |bp->| A |
     bp = PREV_BLKP(bp);
   }
 
@@ -376,8 +373,8 @@ printf("| | | prev is empty\n");
 printf("| | | both are empty\n");
 #endif
     size += BLK_SIZE(PREV_BLKP(bp)) + BLK_SIZE(NEXT_BLKP(bp));
-    PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-    PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+    PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0)); //|<- | bp|   |
+    PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0)); //|   | bp| ->|
     bp = PREV_BLKP(bp);
   }
 
@@ -391,10 +388,6 @@ printf("| | coalesce DONE\n");
  * find_fit - 
  */
 static void *find_fit(size_t asize) {
-#ifdef DEBUG
-printf("| | find_fit BEGINDONE\n");
-#endif
- 
   /* First fit search */
   void *bp = 0;
 
@@ -407,19 +400,20 @@ printf("| | find_fit BEGINDONE\n");
 }
 
 /*
- * place - 
+ * place - places asize block in bp accordingly
  */
 static void place(void *bp, size_t asize) {
 #ifdef DEBUG
-printf("| | place BEGIN\n");
+printf("| | place BEGIN at:%p size:%zu\n", bp, asize);
 #endif
  
   size_t csize = BLK_SIZE(bp);
 
-  if((csize - asize - (2*DSIZE)) >= 0) {
+  if((csize - asize - (2*DSIZE)) >= 0) { //Normal case
     PUT(HDRP(bp), PACK(asize, 1));
     PUT(FTRP(bp), PACK(asize, 1));
     bp = NEXT_BLKP(bp);
+    if(csize==asize) return;
     PUT(HDRP(bp), PACK(csize-asize, 0));
     PUT(FTRP(bp), PACK(csize-asize, 0));
   } else {
@@ -427,8 +421,8 @@ printf("| | place BEGIN\n");
     PUT(FTRP(bp), PACK(csize, 1));
   }
 #ifdef DEBUG
-mm_check();
 printf("| | place DONE\n");
+mm_check();
 #endif
 }
 
