@@ -131,7 +131,7 @@ int mm_init(range_t **ranges)
 {
   /* YOUR IMPLEMENTATION */
 #ifdef DEBUG_STATUS
-printf("\n| mm_init BEGIN\n");
+printf("\n\n| mm_init BEGIN\n");
 #endif
   /* Create the initial empty heap */
   if ((heap_listp = mem_sbrk(4*WSIZE)) == (void *)-1)
@@ -169,14 +169,14 @@ mm_check();
 void* mm_malloc(size_t size)
 {
 #ifdef DEBUG_STATUS
-printf("| mm_malloc BEGIN\n");
+printf("| mm_malloc BEGIN ");
 #endif
   size_t asize;
   size_t extendsize;
   char *bp;
 
-  //if (heap_listp == 0) 
-    //mm_init(NULL); // WARN: not sure if used correctly
+  if (heap_listp == 0) 
+    mm_init(NULL); // WARN: not sure if used correctly
 
   if (size == 0) return NULL;
 
@@ -184,13 +184,10 @@ printf("| mm_malloc BEGIN\n");
   else asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
 
 #ifdef DEBUG
-printf("| | malloc - size: %zu, adjusted size: %zu \n", size, asize);
+printf(" -- size: %zu, adjusted size: %zu \n", size, asize);
 #endif
 
   if((bp = find_fit(asize)) != NULL) {
-#ifdef DEBUG
-printf("| | found fit block:%p\n", bp);
-#endif
     place(bp, asize);
 #ifdef DEBUG
 printf("| mm_malloc DONE\n");
@@ -286,14 +283,10 @@ void printheap(void) {
 
   for(bp = heap_listp; BLK_SIZE(bp) > 0; bp = NEXT_BLKP(bp)) {
     size = (BLK_SIZE(bp));
-    printf("|%7zu%2c |", size, BLK_ALLOC_CHAR(bp));
+    printf("| %p:%zu%2c |", bp, size, BLK_ALLOC_CHAR(bp));
   }
   size = (BLK_SIZE(bp));
-  printf("|%7zu%2c |\n\t              ", size, BLK_ALLOC_CHAR(bp));
-  for(bp = heap_listp; BLK_SIZE(bp) > 0; bp = NEXT_BLKP(bp)) {
-    printf("|%p|", bp);
-  }
-  printf("|%p|\n", bp);
+  printf("| %p:%zu%2c |\n", bp, size, BLK_ALLOC_CHAR(bp));
   return;
 }
 
@@ -303,7 +296,7 @@ void printheap(void) {
  */
 static void *extend_heap(size_t words) {
 #ifdef DEBUG
-printf("| | extend_heap BEGIN size:%zu\n", words);
+printf("| | extend_heap BEGIN -- size:%zu\n", words);
 #endif
 
   char *bp;
@@ -333,9 +326,8 @@ mm_check();
  */
 static void *coalesce(void *bp) {
 #ifdef DEBUG
-printf("debug coalesce: %p\n", PREV_BLKP(bp));
-printf("| | coalesce Called ");
-printf("| prev_blkp:%p:%c, next_blkp: %p:%c\n", PREV_BLKP(bp), BLK_ALLOC_CHAR(PREV_BLKP(bp)), NEXT_BLKP(bp), BLK_ALLOC_CHAR(NEXT_BLKP(bp)));
+printf("| | | coalesce BEGIN");
+printf(" -- prev_blkp:%p:%c, next_blkp: %p:%c ", PREV_BLKP(bp), BLK_ALLOC_CHAR(PREV_BLKP(bp)), NEXT_BLKP(bp), BLK_ALLOC_CHAR(NEXT_BLKP(bp)));
 #endif
   size_t prev_alloc = BLK_ALLOC(PREV_BLKP(bp));
   size_t next_alloc = BLK_ALLOC(NEXT_BLKP(bp));
@@ -343,15 +335,15 @@ printf("| prev_blkp:%p:%c, next_blkp: %p:%c\n", PREV_BLKP(bp), BLK_ALLOC_CHAR(PR
 
   if (prev_alloc && next_alloc) { // both not empty
 #ifdef DEBUG
-printf("| | | both not empty\n");
-printf("| | coalesce DONE\n");
+printf("(both not empty)");
+printf(" -- coalesce DONE\n");
 #endif
     return bp;
   }
 
   else if (prev_alloc && !next_alloc) { // next is empty
 #ifdef DEBUG
-printf("| | | next is empty\n");
+printf("(next is empty)");
 #endif
     size += BLK_SIZE(NEXT_BLKP(bp));
     PUT(HDRP(bp), PACK(size, 0)); //| A |<-bp|   |
@@ -360,7 +352,7 @@ printf("| | | next is empty\n");
 
   else if (!prev_alloc && next_alloc) { // prev is empty
 #ifdef DEBUG
-printf("| | | prev is empty\n");
+printf("(prev is empty)");
 #endif
     size += BLK_SIZE(PREV_BLKP(bp));
     PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));  //|<- | bp | A |
@@ -370,7 +362,7 @@ printf("| | | prev is empty\n");
 
   else { // both are empty
 #ifdef DEBUG
-printf("| | | both are empty\n");
+printf("(both are empty)");
 #endif
     size += BLK_SIZE(PREV_BLKP(bp)) + BLK_SIZE(NEXT_BLKP(bp));
     PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0)); //|<- | bp|   |
@@ -379,7 +371,7 @@ printf("| | | both are empty\n");
   }
 
 #ifdef DEBUG
-printf("| | coalesce DONE\n");
+printf(" -- coalesce DONE\n");
 #endif
   return bp;
 }
@@ -404,7 +396,7 @@ static void *find_fit(size_t asize) {
  */
 static void place(void *bp, size_t asize) {
 #ifdef DEBUG
-printf("| | place BEGIN at:%p size:%zu\n", bp, asize);
+printf("| | place BEGIN at:%p size:%zu ", bp, asize);
 #endif
  
   size_t csize = BLK_SIZE(bp);
@@ -421,9 +413,10 @@ printf("| | place BEGIN at:%p size:%zu\n", bp, asize);
     PUT(FTRP(bp), PACK(csize, 1));
   }
 #ifdef DEBUG
-printf("| | place DONE\n");
+printf(" -- place DONE\n");
 mm_check();
 #endif
+  return;
 }
 
 
