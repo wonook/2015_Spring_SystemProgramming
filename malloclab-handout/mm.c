@@ -46,6 +46,7 @@ static range_t **gl_ranges;
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
+
 /* FUNCTIONS FROM THE BOOK */
 #define WSIZE 4 // Single wods zie in bytes
 #define DSIZE 8 // Double word size in bytes
@@ -72,10 +73,12 @@ static range_t **gl_ranges;
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE((HDRP(bp))))
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
-static char *heap_listp;
+static char *heap_listp = 0;
 
 
 /* OWN FUNCTIONS */
+#define DEBUG //for debugging
+
 #define BLK_SIZE(bp) (GET_SIZE(HDRP(bp)))
 
 int mm_init(range_t **ranges);
@@ -88,6 +91,8 @@ void mm_exit(void);
 int mm_check(void);
 void *extend_heap(size_t words);
 static void *coalesce(void *bp);
+static void *find_fit(size_t asize);
+static void place(void *bp, size_t asize);
 
 
 
@@ -97,6 +102,9 @@ static void *coalesce(void *bp);
  */
 static void remove_range(range_t **ranges, char *lo)
 {
+#ifdef DEBUG
+printf("    remove_range called\n");
+#endif
   range_t *p;
   range_t **prevpp = ranges;
   
@@ -119,7 +127,9 @@ static void remove_range(range_t **ranges, char *lo)
 int mm_init(range_t **ranges)
 {
   /* YOUR IMPLEMENTATION */
-
+#ifdef DEBUG
+printf("  mm_init called\n");
+#endif
   /* Create the initial empty heap */
   if ((heap_listp = mem_sbrk(4*WSIZE)) == (void *)-1)
     return -1;
@@ -136,6 +146,10 @@ int mm_init(range_t **ranges)
   /* DON't MODIFY THIS STAGE AND LEAVE IT AS IT WAS */
   gl_ranges = ranges;
 
+#ifdef DEBUG
+printf("  init done\n");
+#endif
+
   return 0;
 }
 
@@ -145,14 +159,35 @@ int mm_init(range_t **ranges)
  */
 void* mm_malloc(size_t size)
 {
-  int newsize = ALIGN(size + SIZE_T_SIZE);
-  void *p = mem_sbrk(newsize);
-  if (p == (void *)-1)
-    return NULL;
-  else {
-    *(size_t *)p = size;
-    return (void *)((char *)p + SIZE_T_SIZE);
+#ifdef DEBUG
+printf("  mm_malloc called\n");
+#endif
+  size_t asize;
+  size_t extendsize;
+  char *bp;
+
+  if (size == 0) return NULL;
+
+  if (size <= DSIZE) asize = 2*DSIZE;
+  else asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
+
+  if((bp = find_fit(asize)) != NULL) {
+    place(bp, asize);
+    return bp;
   }
+
+  extendsize = MAX(asize, CHUNKSIZE);
+  if((bp = extend_heap(extendsize/WSIZE)) == NULL) return NULL;
+  place(bp, asize);
+  return bp;
+  /*int newsize = ALIGN(size + SIZE_T_SIZE);*/
+  /*void *p = mem_sbrk(newsize);*/
+ /*if (p == (void *)-1)*/
+    /*return NULL;*/
+  /*else {*/
+    /**(size_t *)p = size;*/
+    /*return (void *)((char *)p + SIZE_T_SIZE);*/
+  /*}*/
 }
 
 /*
@@ -161,6 +196,13 @@ void* mm_malloc(size_t size)
 void mm_free(void *ptr)
 {
   /* YOUR IMPLEMENTATION */
+#ifdef DEBUG
+printf("  mm_free called\n");
+#endif
+
+#ifdef DEBUG
+  printf("      reaches here?");
+#endif
   size_t size = GET_SIZE(HDRP(ptr));
 
   PUT(HDRP(ptr), PACK(size, 0));
@@ -177,6 +219,10 @@ void mm_free(void *ptr)
  */
 void* mm_realloc(void *ptr, size_t t)
 {
+#ifdef DEBUG
+printf("  !!mm_realloc called\n");
+#endif
+
   return NULL;
 }
 
@@ -185,6 +231,10 @@ void* mm_realloc(void *ptr, size_t t)
  */
 void mm_exit(void)
 {
+#ifdef DEBUG
+printf("  mm_exit called\n");
+#endif
+
 }
 
 /* EXTRA FUNCTIONS */
@@ -192,13 +242,21 @@ void mm_exit(void)
  * mm_check - checks heap consistency
  */
 int mm_check(void) {
-  
+#ifdef DEBUG
+printf("   mm_check called\n");
+#endif
+
+  return 0;
 }
 
 /*
  * extend_heap - extends the heap
  */
 void *extend_heap(size_t words) {
+#ifdef DEBUG
+printf("    extend_heap called\n");
+#endif
+
   char *bp;
   size_t size;
 
@@ -220,6 +278,9 @@ void *extend_heap(size_t words) {
  * coalesce - coalesces the block upon freeing
  */
 static void *coalesce(void *bp) {
+#ifdef DEBUG
+printf("    coalesce called\n");
+#endif
   size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
   size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
   size_t size = GET_SIZE(HDRP(bp));
@@ -249,6 +310,40 @@ static void *coalesce(void *bp) {
   }
 
   return bp;
+}
+
+/*
+ * find_fit - 
+ */
+static void *find_fit(size_t asize) {
+  /* First fit search */
+  void *bp;
+
+  for(bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+    if(!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
+      return bp;
+    }
+  }
+  return NULL;
+}
+
+/*
+ * place - 
+ */
+static void place(void *bp, size_t asize) {
+  size_t csize = GET_SIZE(HDRP(bp));
+
+  if((csize - asize) <= (2*DSIZE)) {
+    PUT(HDRP(bp), PACK(asize, 1));
+    PUT(FTRP(bp), PACK(asize, 1));
+    bp = NEXT_BLKP(bp);
+    PUT(HDRP(bp), PACK(csize-asize, 0));
+    PUT(FTRP(bp), PACK(csize-asize, 0));
+  } else {
+    PUT(HDRP(bp), PACK(csize, 1));
+    PUT(FTRP(bp), PACK(csize, 1));
+  }
+
 }
 
 
