@@ -488,7 +488,7 @@ if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO UNSEGREGATE!!");
     }
     nextblock = NEXT_FREE_ADDR(bp);
     *listblock = nextblock; // set root of listblock to next free block
-    SET_ROOT(nextblock, 1) //set next block as root
+    SET_ROOT(nextblock, 1); //set next block as root
     *PREV_FREE_ADDR(nextblock) = listblock; //set next block's prev addr as listblock
   } else if (GET_TAIL(bp)) {
     prevblock = PREV_FREE_ADDR(bp);
