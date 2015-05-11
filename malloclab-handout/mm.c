@@ -47,7 +47,7 @@ static range_t **gl_ranges;
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
 
-/* FUNCTIONS FROM THE BOOK */
+/* MACROS FROM THE BOOK */
 #define WSIZE 4 // Single wods zie in bytes
 #define DSIZE 8 // Double word size in bytes
 #define CHUNKSIZE (1<<12) //extend the heap by this amount
@@ -76,7 +76,38 @@ static range_t **gl_ranges;
 
 static char *heap_listp = 0;
 
-/* OWN FUNCTIONS */
+
+/* ALL FUNCTIONS */
+int mm_init(range_t **ranges);
+void* mm_malloc(size_t size);
+void mm_free(void *ptr);
+void* mm_realloc(void *ptr, size_t t);
+void mm_exit(void);
+
+int mm_check(void);
+void printheap(void);
+void printlist(void);
+
+static size_t uppersize(size_t asize);
+static size_t lowersize(size_t asize);
+static void *segblock(size_t asize);
+static void segregate(void *bp);
+static void unsegregate(void *bp);
+
+static void *extend_heap(size_t words);
+static void *coalesce(void *bp);
+static void *find_fit(size_t asize);
+static void place(void *bp, size_t asize);
+
+/* POINTERS TO EACH SEGLIST */
+static char *list1; //2**4: 16,   24,   32,   40,   48,   56
+static char *list2; //2**6: 64,   96,   128,  160,  192,  224
+static char *list3; //2**8: 256,  384,  512,  640,  768,  896
+static char *list4; //2**10:1024, 1536, 2048, 2560, 3072, 3584
+static char *list5; //2**12:4096, 6144, 8192, 10240,12288,14336
+static char *list6; //2**14:16384,24576,32768,40960,49152,else
+
+/* OWN MACROS */
 #define DEBUG //for debugging
 #define DEBUG_STATUS
 
@@ -84,37 +115,30 @@ static char *heap_listp = 0;
 #define BLK_ALLOC(bp) (GET_ALLOC(HDRP(bp)))
 #define BLK_ALLOC_CHAR(bp) ((BLK_ALLOC(bp)) ? 'A' : 'F')
 
-int mm_init(range_t **ranges);
-void* mm_malloc(size_t size);
-void mm_free(void *ptr);
-void* mm_realloc(void *ptr, size_t t);
-void mm_exit(void);
-
-
-int mm_check(void);
-void printheap(void);
-void printlist(void);
-
-static void *extend_heap(size_t words);
-static void *coalesce(void *bp);
-static void *find_fit(size_t asize);
-static void place(void *bp, size_t asize);
-
-#define SIZE1 8
+#define SIZE1 16
 #define SIZE2 64
 #define SIZE3 256
 #define SIZE4 1024
 #define SIZE5 4096
 #define SIZE6 16384
-#define LIST_PTR(bp, num) ((char *)(bp) + (num * (BLK_SIZE(bp))))
+#define SIZE7 65536
 
-static size_t adjustsize(size_t size);
-static char *list1; //2**3: 8, 16, 24, 32, 40, 48, 56
-static char *list2; //2**6: 64, 128, 192
-static char *list3; //2**8: 256, 512, 768
-static char *list4; //2**10: 1024, 2048, 3072
-static char *list5; //2**12: 4096, 8192, 12288
-static char *list6; //2**14: 16384, 32768, 49152
+#define LIST_PTR(bp, num) (GET((char *)(bp) + (num * (DSIZE))) & ~0x7) //use is as LIST_PTR(size1, 1) to get free blocks of 16
+#define LIST_ALLOC(bp) (GET_ALLOC(bp)) // sees if this seglist block is free (if there are any free blocks or not) -- to assign one, use PUT(bp, PACK(address, 1))
+#define LIST_ALLOC_CHAR(bp) (GET_ALLOC_CHAR(bp))
+#define LIST_ROOT(bp) (GET((char *)(bp)) & ~0x7)
+
+#define IS_ROOT(bp) (GET(bp) & 0x4) // sees if the free block is seglist ROOT
+#define SET_ROOT(bp, val) (PUT(bp, ((GET(bp) & ~0x4) | (0x4*val))))
+#define IS_TAIL(bp) (GET(bp) & 0x2) // sees if the free block is seglist TAIL
+#define SET_TAIL(bp, val) (PUT(bp, ((GET(bp) & ~0x2) | (0x2*val))))
+
+#define FREEPACK(addr, root, tail, alloc) ((size)|4*(root)|2*(tail)|(alloc)) // packs information for the header/footer of the free block
+
+#define NEXT_FREE_ADDR(bp) (GET(bp) & ~0x7) // gets address of next free block on the list
+#define PREV_FREE_ADDR(bp) (GET(bp + DSIZE) & ~0x7) // gets address of previous free block on the list
+#define SET_NEXT_FREE_ADDR(bp, addr) (PUT(bp, addr) // assign address of next free block
+#define SET_PREV_FREE_ADDR(bp, addr) (PUT(bp+DSIZE, addr))
 
 
 /* 
@@ -156,20 +180,15 @@ printf("\n\n| mm_init BEGIN\n");
 
   /* make the seglist */
   list1 = heap_listp;
-  for(i=0; i<7; i++) PUT(list1 + (i * DSIZE), 0);
-  list2 = (heap_listp += 7*DSIZE);
-  for(i=0; i<3; i++) PUT(list2 + (i * DSIZE), 0);
-  list3 = (heap_listp += 3*DSIZE);
-  for(i=0; i<3; i++) PUT(list3 + (i * DSIZE), 0);
-  list4 = (heap_listp += 3*DSIZE);
-  for(i=0; i<3; i++) PUT(list4 + (i * DSIZE), 0);
-  list5 = (heap_listp += 3*DSIZE);
-  for(i=0; i<3; i++) PUT(list5 + (i * DSIZE), 0);
-  list6 = (heap_listp += 3*DSIZE);
-  for(i=0; i<3; i++) PUT(list6 + (i * DSIZE), 0);
+  list2 = (heap_listp += 6*DSIZE);
+  list3 = (heap_listp += 6*DSIZE);
+  list4 = (heap_listp += 6*DSIZE);
+  list5 = (heap_listp += 6*DSIZE);
+  list6 = (heap_listp += 6*DSIZE);
+  heap_listp += 6*DSIZE;
+  for(i=0; i<36; i++) PUT(list1 + (i * DSIZE), 0); //initialize seglist
 
   /* empty heap */
-  heap_listp += 3*DSIZE;
   PUT(heap_listp, 0);
   PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1));
   PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1));
@@ -216,7 +235,7 @@ printf("| mm_malloc BEGIN ");
   if (size == 0) return NULL;
 
   if (size <= DSIZE) asize = 2*DSIZE;
-  else asize = adjustsize(size);
+  else asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
 
 #ifdef DEBUG
 printf(" -- size: %zu, adjusted size: %zu \n", size, asize);
@@ -304,7 +323,7 @@ mm_check();
  */
 int mm_check(void) {
   printheap();
-
+  printlist();
   return 0;
 }
 
@@ -331,27 +350,27 @@ void printlist(void) {
   int i;
 
   for(i=0; list2!=bp; bp = list1 + (DSIZE*i++)) {
-    printf("| %p:%8o |", bp, GET(bp));
+    printf("| %p:%p:%d:%2c |", bp, LIST_ROOT(bp), SIZE1 + (i * (SIZE1 / 2)), LIST_ALLOC_CHAR(bp));
   } printf("\n\t              ");
 
   for(i=0; list3!=bp; bp = list2 + (DSIZE*i++)) {
-    printf("| %p:%8o |", bp, GET(bp));
+    printf("| %p:%p:%d:%2c |", bp, LIST_ROOT(bp), SIZE2 + (i * (SIZE2 / 2)), LIST_ALLOC_CHAR(bp));
   } printf("\n\t              ");
 
   for(i=0; list4!=bp; bp = list3 + (DSIZE*i++)) {
-    printf("| %p:%8o |", bp, GET(bp));
+    printf("| %p:%p:%d:%2c |", bp, LIST_ROOT(bp), SIZE3 + (i * (SIZE3 / 2)), LIST_ALLOC_CHAR(bp));
   } printf("\n\t              ");
 
   for(i=0; list5!=bp; bp = list4 + (DSIZE*i++)) {
-    printf("| %p:%8o |", bp, GET(bp));
+    printf("| %p:%p:%d:%2c |", bp, LIST_ROOT(bp), SIZE4 + (i * (SIZE4 / 2)), LIST_ALLOC_CHAR(bp));
   } printf("\n\t              ");
 
   for(i=0; list6!=bp; bp = list5 + (DSIZE*i++)) {
-    printf("| %p:%8o |", bp, GET(bp));
+    printf("| %p:%p:%d:%2c |", bp, LIST_ROOT(bp), SIZE5 + (i * (SIZE5 / 2)), LIST_ALLOC_CHAR(bp));
   } printf("\n\t              ");
 
   for(i=0; heap_listp!=bp; bp = list6 + (DSIZE*i++)) {
-    printf("| %p:%8o |", bp, GET(bp));
+    printf("| %p:%p:%d:%2c |", bp, LIST_ROOT(bp), SIZE6 + (i * (SIZE6 / 2)), LIST_ALLOC_CHAR(bp));
   } printf("\n");
 }
 
@@ -360,19 +379,120 @@ void printlist(void) {
 /*
  * adjustsize - returns adjusted size
  */
-static size_t adjustsize(size_t size) {
-  if(size < SIZE2)
-    return SIZE1 * ((size + (SIZE1) + (SIZE1-1)) / SIZE1);
-  else if(size < SIZE3)
-    return SIZE2 * ((size + (SIZE2) + (SIZE2-1)) / SIZE2);
-  else if(size < SIZE4)
-    return SIZE3 * ((size + (SIZE3) + (SIZE3-1)) / SIZE3);
-  else if(size < SIZE5)
-    return SIZE4 * ((size + (SIZE4) + (SIZE4-1)) / SIZE4);
-  else if(size < SIZE6)
-    return SIZE5 * ((size + (SIZE5) + (SIZE5-1)) / SIZE5);
+static size_t uppersize(size_t asize) {
+  if(asize <= SIZE2)
+    return asize;
+  else if(asize <= SIZE3)
+    return SIZE2 * ((asize + (SIZE2-1)) / SIZE2);
+  else if(asize <= SIZE4)
+    return SIZE3 * ((asize + (SIZE3-1)) / SIZE3);
+  else if(asize <= SIZE5)
+    return SIZE4 * ((asize + (SIZE4-1)) / SIZE4);
+  else if(asize <= SIZE6)
+    return SIZE5 * ((asize + (SIZE5-1)) / SIZE5);
+  else if(asize <= SIZE7)
+    return SIZE6 * ((asize + (SIZE6-1)) / SIZE6);
   else
-    return SIZE6 * ((size + (SIZE6) + (SIZE6-1)) / SIZE6);
+    return asize;
+}
+
+static size_t lowersize(size_t asize) {
+  if(asize <= SIZE2)
+    return asize;
+  else if(asize <= SIZE3)
+    return SIZE2 * (asize / SIZE2);
+  else if(asize <= SIZE4)
+    return SIZE3 * (asize / SIZE3);
+  else if(asize <= SIZE5)
+    return SIZE4 * (asize / SIZE4);
+  else if(asize <= SIZE6)
+    return SIZE5 * (asize / SIZE5);
+  else if(asize <= SIZE7)
+    return SIZE6 * (asize / SIZE6);
+  else
+    return asize;
+}
+
+static void *segblock(size_t asize) {
+  int i;
+  if(asize < SIZE2) {
+    for(i=5; asize<SIZE1+(i*DSIZE); i--);
+    return LIST_PTR(list1, i);
+  } else if(asize < SIZE3) {
+    for(i=5; asize<SIZE2+(i*SIZE2); i--);
+    return LIST_PTR(list2, i);
+  } else if(asize < SIZE4) {
+    for(i=5; asize<SIZE3+(i*SIZE3); i--);
+    return LIST_PTR(list3, i);
+  } else if(asize < SIZE5) {
+    for(i=5; asize<SIZE4+(i*SIZE4); i--);
+    return LIST_PTR(list4, i);
+  } else if(asize < SIZE6) {
+    for(i=5; asize<SIZE5+(i*SIZE5); i--);
+    return LIST_PTR(list5, i);
+  } else if(asize < SIZE7) {
+    for(i=5; asize<SIZE6+(i*SIZE6); i--);
+    return LIST_PTR(list6, i);
+  } else {
+    return LIST_PTR(list6, 5); //last one
+  }
+}
+
+/*
+ * segregate-
+ */
+static void segregate(void *bp) {
+  size_t size = BLK_SIZE(bp);
+  char *listblock = segblock(size); // get where to put this free block
+
+#ifdef DEBUG
+if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO SEGREGATE!!");
+#endif
+
+  if(!LIST_ALLOC(listblock)) { //if seglist is empty
+    PUT(HDRP(bp), FREEPACK(size, 1, 1, 0));
+    PUT(FTRP(bp), FREEPACK(size, 1, 1, 0));
+    PUT(listblock, PACK(bp, 1));
+  }
+
+  char *oldroot = LIST_ROOT(listblock); // push onto the seglist
+  SET_ROOT(HDRP(oldroot), 0); //not root anymore
+  SET_ROOT(FTRP(oldroot), 0);
+  SET_ROOT(HDRP(bp), 1); //new root
+  SET_ROOT(FTRP(bp), 1);
+
+  SET_PREV_FREE_ADDR(oldroot, bp);
+  SET_NEXT_FREE_ADDR(bp, oldroot);
+  SET_PREV_FREE_ADDR(bp, listblock);
+  return;
+}
+
+/*
+ * unsegregate-
+ */
+static void unsegregate(void *bp) {
+#ifdef DEBUG
+if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO UNSEGREGATE!!");
+#endif
+
+  char *prevblock = PREV_FREE_ADDR(bp);
+
+  if (IS_ROOT(bp)) {
+    if(IS_TAIL(bp)) { //both root and tail
+      PUT(prevblock, 0); // initialize the listblock
+      return;
+    }
+    PUT(prevblock, PACK(NEXT_FREE_ADDR(bp), 1)); // set root of prevblock(listblock) to next free block
+    SET_ROOT(NEXT_FREE_ADDR(bp), 1); // set next block as root
+    SET_PREV_FREE_ADDR(NEXT_FREE_ADDR(bp), prevblock); //set next block's prev addr as prevblock(listblock)
+  } else if (IS_TAIL(bp)) {
+    SET_TAIL(prevblock, 1); //set prevblock as tail
+    SET_NEXT_FREE_ADDR(prevblock, 0); //initialize nextaddr of new tail
+  } else {
+    char *nextblock = NEXT_FREE_ADDR(bp);
+    SET_NEXT_FREE_ADDR(prevblock, nextblock);
+    SET_PREV_FREE_ADDR(nextblock, prevblock);
+  }
 }
 
 /*
@@ -397,6 +517,8 @@ printf("| | extend_heap BEGIN -- size:%zu\n", words);
   PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); //New epilogue header
 
   bp = coalesce(bp);
+
+  segregate(bp);
 #ifdef DEBUG
 printf("| | extend_heap DONE\n");
 mm_check();
