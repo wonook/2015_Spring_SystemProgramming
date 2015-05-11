@@ -93,6 +93,7 @@ void mm_exit(void);
 
 int mm_check(void);
 void printheap(void);
+void printlist(void);
 
 static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
@@ -107,7 +108,7 @@ static void place(void *bp, size_t asize);
 #define SIZE6 16384
 #define LIST_PTR(bp, num) ((char *)(bp) + (num * (BLK_SIZE(bp))))
 
-static size_t asize(size_t size);
+static size_t adjustsize(size_t size);
 static char *list1; //2**3: 8, 16, 24, 32, 40, 48, 56
 static char *list2; //2**6: 64, 128, 192
 static char *list3; //2**8: 256, 512, 768
@@ -148,14 +149,26 @@ int mm_init(range_t **ranges)
 printf("\n\n| mm_init BEGIN\n");
 #endif
   /* Create the initial empty heap */
+  int i;
+
   if ((heap_listp = mem_sbrk(22*DSIZE + 4*WSIZE)) == (void *)-1)
     return -1;
-  list1 = heap_listp
+
+  /* make the seglist */
+  list1 = heap_listp;
+  for(i=0; i<7; i++) PUT(list1 + (i * DSIZE), 0);
   list2 = (heap_listp += 7*DSIZE);
+  for(i=0; i<3; i++) PUT(list2 + (i * DSIZE), 0);
   list3 = (heap_listp += 3*DSIZE);
+  for(i=0; i<3; i++) PUT(list3 + (i * DSIZE), 0);
   list4 = (heap_listp += 3*DSIZE);
+  for(i=0; i<3; i++) PUT(list4 + (i * DSIZE), 0);
   list5 = (heap_listp += 3*DSIZE);
+  for(i=0; i<3; i++) PUT(list5 + (i * DSIZE), 0);
   list6 = (heap_listp += 3*DSIZE);
+  for(i=0; i<3; i++) PUT(list6 + (i * DSIZE), 0);
+
+  /* empty heap */
   heap_listp += 3*DSIZE;
   PUT(heap_listp, 0);
   PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1));
@@ -164,6 +177,7 @@ printf("\n\n| mm_init BEGIN\n");
   heap_listp += (2*WSIZE); // Middle of prologue block
 
 #ifdef DEBUG
+printlist();
 mm_check();
 #endif
 
@@ -202,7 +216,7 @@ printf("| mm_malloc BEGIN ");
   if (size == 0) return NULL;
 
   if (size <= DSIZE) asize = 2*DSIZE;
-  else asize = asize(size);
+  else asize = adjustsize(size);
 
 #ifdef DEBUG
 printf(" -- size: %zu, adjusted size: %zu \n", size, asize);
@@ -313,41 +327,40 @@ void printheap(void) {
 
 void printlist(void) {
   printf("\tCURRENT LIST: ");
-  void *bp = 0;
-  size_t size;
+  void *bp = list1;
   int i;
 
-  for(bp = list1, i=0; bp != list2; bp = LIST_PTR(list1, i++)) {
-    printf("| %p:%zu |", bp, GET(bp));
-  } printf("\n");
+  for(i=0; list2!=bp; bp = list1 + (DSIZE*i++)) {
+    printf("| %p:%8o |", bp, GET(bp));
+  } printf("\n\t              ");
 
-  for(bp = list2, i=0; bp != list3; bp = LIST_PTR(list1, i++)) {
-    printf("| %p:%zu |", bp, GET(bp));
-  } printf("\n");
+  for(i=0; list3!=bp; bp = list2 + (DSIZE*i++)) {
+    printf("| %p:%8o |", bp, GET(bp));
+  } printf("\n\t              ");
 
-  for(bp = list3, i=0; bp != list4; bp = LIST_PTR(list1, i++)) {
-    printf("| %p:%zu |", bp, GET(bp));
-  } printf("\n");
+  for(i=0; list4!=bp; bp = list3 + (DSIZE*i++)) {
+    printf("| %p:%8o |", bp, GET(bp));
+  } printf("\n\t              ");
 
-  for(bp = list4, i=0; bp != list2; bp = LIST_PTR(list1, i++)) {
-    printf("| %p:%zu |", bp, GET(bp));
-  } printf("\n");
+  for(i=0; list5!=bp; bp = list4 + (DSIZE*i++)) {
+    printf("| %p:%8o |", bp, GET(bp));
+  } printf("\n\t              ");
 
-  for(bp = list5, i=0; bp != list2; bp = LIST_PTR(list1, i++)) {
-    printf("| %p:%zu |", bp, GET(bp));
-  } printf("\n");
+  for(i=0; list6!=bp; bp = list5 + (DSIZE*i++)) {
+    printf("| %p:%8o |", bp, GET(bp));
+  } printf("\n\t              ");
 
-  for(bp = list6, i=0; BLK_SIZE(bp) > 0; bp = LIST_PTR(list1, i++)) {
-    printf("| %p:%zu |", bp, GET(bp));
+  for(i=0; heap_listp!=bp; bp = list6 + (DSIZE*i++)) {
+    printf("| %p:%8o |", bp, GET(bp));
   } printf("\n");
 }
 
 /* ===============================EXTRA FUNCTIONS========================= */
 
 /*
- * asize - returns adjusted size
+ * adjustsize - returns adjusted size
  */
-static size_t asize(size_t size) {
+static size_t adjustsize(size_t size) {
   if(size < SIZE2)
     return SIZE1 * ((size + (SIZE1) + (SIZE1-1)) / SIZE1);
   else if(size < SIZE3)
