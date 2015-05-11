@@ -77,8 +77,8 @@ static range_t **gl_ranges;
 static char *heap_listp = 0;
 
 /* OWN FUNCTIONS */
-//#define DEBUG //for debugging
-//#define DEBUG_STATUS
+#define DEBUG //for debugging
+#define DEBUG_STATUS
 
 #define BLK_SIZE(bp) (GET_SIZE(HDRP(bp)))
 #define BLK_ALLOC(bp) (GET_ALLOC(HDRP(bp)))
