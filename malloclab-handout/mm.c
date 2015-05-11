@@ -76,7 +76,6 @@ static range_t **gl_ranges;
 
 static char *heap_listp = 0;
 
-
 /* OWN FUNCTIONS */
 //#define DEBUG //for debugging
 //#define DEBUG_STATUS
@@ -100,6 +99,21 @@ static void *coalesce(void *bp);
 static void *find_fit(size_t asize);
 static void place(void *bp, size_t asize);
 
+#define SIZE1 8
+#define SIZE2 64
+#define SIZE3 256
+#define SIZE4 1024
+#define SIZE5 4096
+#define SIZE6 16384
+#define LIST_PTR(bp, num) ((char *)(bp) + (num * (BLK_SIZE(bp))))
+
+static size_t asize(size_t size);
+static char *list1; //2**3: 8, 16, 24, 32, 40, 48, 56
+static char *list2; //2**6: 64, 128, 192
+static char *list3; //2**8: 256, 512, 768
+static char *list4; //2**10: 1024, 2048, 3072
+static char *list5; //2**12: 4096, 8192, 12288
+static char *list6; //2**14: 16384, 32768, 49152
 
 
 /* 
@@ -134,8 +148,15 @@ int mm_init(range_t **ranges)
 printf("\n\n| mm_init BEGIN\n");
 #endif
   /* Create the initial empty heap */
-  if ((heap_listp = mem_sbrk(4*WSIZE)) == (void *)-1)
+  if ((heap_listp = mem_sbrk(22*DSIZE + 4*WSIZE)) == (void *)-1)
     return -1;
+  list1 = heap_listp
+  list2 = (heap_listp += 7*DSIZE);
+  list3 = (heap_listp += 3*DSIZE);
+  list4 = (heap_listp += 3*DSIZE);
+  list5 = (heap_listp += 3*DSIZE);
+  list6 = (heap_listp += 3*DSIZE);
+  heap_listp += 3*DSIZE;
   PUT(heap_listp, 0);
   PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1));
   PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1));
@@ -181,7 +202,7 @@ printf("| mm_malloc BEGIN ");
   if (size == 0) return NULL;
 
   if (size <= DSIZE) asize = 2*DSIZE;
-  else asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
+  else asize = asize(size);
 
 #ifdef DEBUG
 printf(" -- size: %zu, adjusted size: %zu \n", size, asize);
@@ -290,7 +311,57 @@ void printheap(void) {
   return;
 }
 
+void printlist(void) {
+  printf("\tCURRENT LIST: ");
+  void *bp = 0;
+  size_t size;
+  int i;
+
+  for(bp = list1, i=0; bp != list2; bp = LIST_PTR(list1, i++)) {
+    printf("| %p:%zu |", bp, GET(bp));
+  } printf("\n");
+
+  for(bp = list2, i=0; bp != list3; bp = LIST_PTR(list1, i++)) {
+    printf("| %p:%zu |", bp, GET(bp));
+  } printf("\n");
+
+  for(bp = list3, i=0; bp != list4; bp = LIST_PTR(list1, i++)) {
+    printf("| %p:%zu |", bp, GET(bp));
+  } printf("\n");
+
+  for(bp = list4, i=0; bp != list2; bp = LIST_PTR(list1, i++)) {
+    printf("| %p:%zu |", bp, GET(bp));
+  } printf("\n");
+
+  for(bp = list5, i=0; bp != list2; bp = LIST_PTR(list1, i++)) {
+    printf("| %p:%zu |", bp, GET(bp));
+  } printf("\n");
+
+  for(bp = list6, i=0; BLK_SIZE(bp) > 0; bp = LIST_PTR(list1, i++)) {
+    printf("| %p:%zu |", bp, GET(bp));
+  } printf("\n");
+}
+
 /* ===============================EXTRA FUNCTIONS========================= */
+
+/*
+ * asize - returns adjusted size
+ */
+static size_t asize(size_t size) {
+  if(size < SIZE2)
+    return SIZE1 * ((size + (SIZE1) + (SIZE1-1)) / SIZE1);
+  else if(size < SIZE3)
+    return SIZE2 * ((size + (SIZE2) + (SIZE2-1)) / SIZE2);
+  else if(size < SIZE4)
+    return SIZE3 * ((size + (SIZE3) + (SIZE3-1)) / SIZE3);
+  else if(size < SIZE5)
+    return SIZE4 * ((size + (SIZE4) + (SIZE4-1)) / SIZE4);
+  else if(size < SIZE6)
+    return SIZE5 * ((size + (SIZE5) + (SIZE5-1)) / SIZE5);
+  else
+    return SIZE6 * ((size + (SIZE6) + (SIZE6-1)) / SIZE6);
+}
+
 /*
  * extend_heap - extends the heap
  */
