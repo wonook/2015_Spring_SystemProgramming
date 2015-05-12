@@ -123,20 +123,19 @@ static char *list6; //2**14:16384,24576,32768,40960,49152,else
 #define SIZE6 16384
 #define SIZE7 65536
 
-#define LIST_PTR(bp, num) ((char *)(bp) + (num * (WSIZE))) //use is as LIST_PTR(list1, 1) to get list ptr to blocks of 16
-#define ROOT_ADDR(bp) (*(char *)(bp))
-#define ROOT_BLK(bp) (*(char *)(LIST_ROOT(bp)))
-#define LIST_ALLOC(bp) ((ROOT_ADDR(bp) == 0) ? 0 : 1) // sees if this seglist block is free (if there are any free blocks or not) -- to assign one, use PUT(bp, PACK(address, 1))
-#define LIST_ALLOC_CHAR(bp) ((ROOT_ADDR(bp) == 0) ? 'F' : 'A')
+#define LIST_PTR(lp, num) ((char *)(lp) + (num * (WSIZE))) //use is as LIST_PTR(list1, 1) to get list ptr to blocks of 16
+#define ROOT_ADDR(lp) (lp)
+#define ROOT_BLK(lp) (*(char *)(lp))
+#define LIST_ALLOC(lp) (((lp) == NULL) ? 0 : 1) // sees if this seglist block is free (if there are any free blocks or not) -- to assign one, use PUT(bp, PACK(address, 1))
+#define LIST_ALLOC_CHAR(lp) (((lp) == NULL) ? 'F' : 'A')
 
-#define GET_ROOT(bp) (GET(bp) & 0x4) // sees if the free block is seglist ROOT
-#define GET_TAIL(bp) (GET(bp) & 0x2) // sees if the free block is seglist TAIL
+#define GET_ROOT(bp) (GET(HDRP(bp)) & 0x4) // sees if the free block is seglist ROOT
+#define GET_TAIL(bp) (GET(HDRP(bp)) & 0x2) // sees if the free block is seglist TAIL
 
 #define FREEPACK(addr, root, tail, alloc) ((size)|4*(root)|2*(tail)|(alloc)) // packs information for the header/footer of the free block
-#define ADDRPACK(addr) ((char *)(addr))
 
-#define NEXT_FREE_ADDR(bp) (*(char *)(bp)) // gets address of next free block on the list
-#define PREV_FREE_ADDR(bp) (*((char *)(bp) + WSIZE)) // gets address of previous free block on the list
+#define NEXT_FREE_ADDR(bp) (*(char **)(bp)) // gets address of next free block on the list
+#define PREV_FREE_ADDR(bp) (*((char **)(bp) + WSIZE)) // gets address of previous free block on the list
 #define SET_NEXT_FREE_ADDR(bp, addr) ((NEXT_FREE_ADDR(bp)) = addr) // assign address of next free block
 #define SET_PREV_FREE_ADDR(bp, addr) ((PREV_FREE_ADDR(bp)) = addr)
 
@@ -174,6 +173,7 @@ printf("\n\n| mm_init BEGIN\n");
 #endif
   /* Create the initial empty heap */
   int i;
+  char **listblock;
 
   if ((heap_listp = mem_sbrk(36*WSIZE + 4*WSIZE)) == (void *)-1)
     return -1;
@@ -187,9 +187,10 @@ printf("\n\n| mm_init BEGIN\n");
   list6 = (heap_listp += 6*WSIZE);
   heap_listp += 6*WSIZE;
   for(i=0; i<36; i++) {
-    PUT(LIST_PTR(list1, i), 0);//initialize seglist : set ROOT_ADDR as 0
+    listblock = LIST_PTR(list1, i);
+    *listblock = NULL;//initialize seglist : set ROOT_ADDR as 0
 #ifdef DEBUG
-/*printf(" | initialized %p | ", LIST_PTR(list1, i));*/
+/*printf(" | initialized %p to %p | ", listblock, *listblock);*/
 #endif
   }
 
@@ -201,7 +202,6 @@ printf("\n\n| mm_init BEGIN\n");
   heap_listp += (2*WSIZE); // Middle of prologue block
 
 #ifdef DEBUG
-printlist();
 mm_check();
 #endif
 
@@ -351,31 +351,32 @@ void printheap(void) {
 
 void printlist(void) {
   printf("\tCURRENT LIST: ");
-  void *bp = list1;
+  char **listblock;
   int i;
 
-  for(i=0; bp != list2; bp = LIST_PTR(list1, ++i)) {
-    printf("| %p:%x:%d:%2c |", bp, ROOT_ADDR(bp), SIZE1 + (i * (SIZE1 / 2)), LIST_ALLOC_CHAR(bp));
+  listblock = list1;
+  for(i=0; listblock < list2; listblock = LIST_PTR(list1, ++i)) {
+    printf("| %p:%5d->%p |", listblock, SIZE1 + (i * (SIZE1 / 2)), *listblock);
   } printf("\n\t              ");
 
-  for(i=0; bp != list3; bp = LIST_PTR(list2, ++i)) {
-    printf("| %p:%x:%d:%2c |", bp, ROOT_ADDR(bp), SIZE2 + (i * (SIZE2 / 2)), LIST_ALLOC_CHAR(bp));
+  for(i=0; listblock < list3; listblock = LIST_PTR(list2, ++i)) {
+    printf("| %p:%5d->%p |", listblock, SIZE2 + (i * (SIZE2 / 2)), *listblock);
   } printf("\n\t              ");
 
-  for(i=0; bp != list4; bp = LIST_PTR(list3, ++i)) {
-    printf("| %p:%x:%d:%2c |", bp, ROOT_ADDR(bp), SIZE3 + (i * (SIZE3 / 2)), LIST_ALLOC_CHAR(bp));
+  for(i=0; listblock < list4; listblock = LIST_PTR(list3, ++i)) {
+    printf("| %p:%5d->%p |", listblock, SIZE3 + (i * (SIZE3 / 2)), *listblock);
   } printf("\n\t              ");
 
-  for(i=0; bp != list5; bp = LIST_PTR(list4, ++i)) {
-    printf("| %p:%x:%d:%2c |", bp, ROOT_ADDR(bp), SIZE4 + (i * (SIZE4 / 2)), LIST_ALLOC_CHAR(bp));
+  for(i=0; listblock < list5; listblock = LIST_PTR(list4, ++i)) {
+    printf("| %p:%5d->%p |", listblock, SIZE4 + (i * (SIZE4 / 2)), *listblock);
   } printf("\n\t              ");
 
-  for(i=0; bp != list6; bp = LIST_PTR(list5, ++i)) {
-    printf("| %p:%x:%d:%2c |", bp, ROOT_ADDR(bp), SIZE5 + (i * (SIZE5 / 2)), LIST_ALLOC_CHAR(bp));
+  for(i=0; listblock < list6; listblock = LIST_PTR(list5, ++i)) {
+    printf("| %p:%5d->%p |", listblock, SIZE5 + (i * (SIZE5 / 2)), *listblock);
   } printf("\n\t              ");
 
-  for(i=0; bp != heap_listp - 2 * WSIZE; bp = LIST_PTR(list6, ++i)) {
-    printf("| %p:%x:%d:%2c |", bp, ROOT_ADDR(bp), SIZE6 + (i * (SIZE6 / 2)), LIST_ALLOC_CHAR(bp));
+  for(i=0; listblock < list6 + 6 * WSIZE; listblock = LIST_PTR(list6, ++i)) {
+    printf("| %p:%5d->%p |", listblock, SIZE6 + (i * (SIZE6 / 2)), *listblock);
   } printf("\n");
 }
 
@@ -422,22 +423,22 @@ static void *segblock(size_t asize) {
   int i;
   char *result;
   if(asize < SIZE2) {
-    for(i=5; asize<SIZE1+(i*DSIZE); i--);
+    for(i=5; asize < SIZE1+(i*DSIZE); --i);
     result = LIST_PTR(list1, i);
   } else if(asize < SIZE3) {
-    for(i=5; asize<SIZE2+(i*SIZE2); i--);
+    for(i=5; asize < SIZE2+(i*SIZE2); --i);
     result = LIST_PTR(list2, i);
   } else if(asize < SIZE4) {
-    for(i=5; asize<SIZE3+(i*SIZE3); i--);
+    for(i=5; asize < SIZE3+(i*SIZE3); --i);
     result = LIST_PTR(list3, i);
   } else if(asize < SIZE5) {
-    for(i=5; asize<SIZE4+(i*SIZE4); i--);
+    for(i=5; asize < SIZE4+(i*SIZE4); --i);
     result = LIST_PTR(list4, i);
   } else if(asize < SIZE6) {
-    for(i=5; asize<SIZE5+(i*SIZE5); i--);
+    for(i=5; asize < SIZE5+(i*SIZE5); --i);
     result = LIST_PTR(list5, i);
   } else if(asize < SIZE7) {
-    for(i=5; asize<SIZE6+(i*SIZE6); i--);
+    for(i=5; asize < SIZE6+(i*SIZE6); --i);
     result = LIST_PTR(list6, i);
   } else {
     result = LIST_PTR(list6, 5); //last one
@@ -450,20 +451,27 @@ static void *segblock(size_t asize) {
  */
 static void segregate(void *bp) {
   size_t size = BLK_SIZE(bp);
-  char **listblock = segblock(size); // get where to put this free block
+  char **listblock = (segblock(size)); // get where to put this free block
 
 #ifdef DEBUG
+printf("| | | | segregate BEGIN for %p(%d) to %p:%c", bp, BLK_SIZE(bp), listblock, LIST_ALLOC_CHAR(*listblock));
 if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO SEGREGATE!!");
 #endif
 
-  if(!LIST_ALLOC(listblock)) { //if seglist is empty
+  if(!(LIST_ALLOC(*listblock))) { //if seglist is empty
+#ifdef DEBUG
+printf(" -- seglist is empty! segregate DONE\n");
+#endif
+    *listblock = bp;
+    PREV_FREE_ADDR(bp) = listblock;
     PUT(HDRP(bp), FREEPACK(size, 1, 1, 0));
     PUT(FTRP(bp), FREEPACK(size, 1, 1, 0));
-    *listblock = bp;
+    return;
   }
 
   char *oldroot;
-  oldroot = ROOT_ADDR(listblock); // push onto the seglist
+  oldroot = *listblock; // get the old root
+  *listblock = bp; //push the new root onto the seglist
   (*HDRP(oldroot) = (*HDRP(oldroot) & ~0x4)); //not root anymore
   (*FTRP(oldroot) = (*FTRP(oldroot) & ~0x4));
   (*HDRP(bp) = (*HDRP(bp) | 0x4)); //bp as new root
@@ -472,6 +480,9 @@ if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO SEGREGATE!!");
   PREV_FREE_ADDR(oldroot) = bp;
   NEXT_FREE_ADDR(bp) = oldroot;
   PREV_FREE_ADDR(bp) = listblock;
+#ifdef DEBUG
+printf(" -- segregate DONE\n");
+#endif
   return;
 }
 
@@ -483,22 +494,22 @@ static void unsegregate(void *bp) {
 if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO UNSEGREGATE!!");
 #endif
 
-  char *listblock;
+  char **listblock;
   char *prevblock;
   char *nextblock;
 
-  if (GET_ROOT(bp)) {
+  if (GET_ROOT(bp)) { //bp is root
     listblock = PREV_FREE_ADDR(bp);
     if(GET_TAIL(bp)) { //both root and tail
-      PUT(listblock, 0); // initialize the listblock
+      PUT(*listblock, 0); // initialize the listblock
       return;
     }
     nextblock = NEXT_FREE_ADDR(bp);
     *listblock = nextblock; // set root of listblock to next free block
+    PREV_FREE_ADDR(nextblock) = listblock; //set next block's prev addr as listblock
     *HDRP(nextblock) = (*HDRP(nextblock) | 0x4); //set next block as root
     *FTRP(nextblock) = (*FTRP(nextblock) | 0x4);
-    PREV_FREE_ADDR(nextblock) = listblock; //set next block's prev addr as listblock
-  } else if (GET_TAIL(bp)) {
+  } else if (GET_TAIL(bp)) { //bp is tail
     prevblock = PREV_FREE_ADDR(bp);
     *HDRP(prevblock) = (*HDRP(prevblock) | 0x2); //set prevblock as tail
     *FTRP(prevblock) = (*FTRP(prevblock) | 0x2);
