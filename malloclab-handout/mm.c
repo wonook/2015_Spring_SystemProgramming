@@ -50,7 +50,7 @@ static range_t **gl_ranges;
 /* MACROS FROM THE BOOK */
 #define WSIZE 4 // Single wods zie in bytes
 #define DSIZE 8 // Double word size in bytes
-#define CHUNKSIZE (1<<12) //extend the heap by this amount
+#define CHUNKSIZE (1<<6) //extend the heap by this amount
 
 #define MAX(x, y)   ((x) > (y) ? (x) : (y))
 
@@ -218,6 +218,7 @@ printf("| init DONE\n");
 #ifdef DEBUG
 mm_check();
 #endif
+
   return 0;
 }
 
@@ -230,6 +231,7 @@ void* mm_malloc(size_t size)
 #ifdef DEBUG_STATUS
 printf("| mm_malloc BEGIN ");
 #endif
+
   size_t asize;
   size_t extendsize;
   char *bp;
@@ -248,18 +250,22 @@ printf(" -- size: %zu, adjusted size: %zu \n", size, asize);
 
   if((bp = find_fit(asize)) != NULL) {
     place(bp, asize);
+
 #ifdef DEBUG
 printf("| mm_malloc DONE\n");
 #endif
+
     return bp;
   }
 
   extendsize = MAX(asize, CHUNKSIZE);
   if((bp = extend_heap(extendsize/WSIZE)) == NULL) return NULL;
   place(bp, asize);
+
 #ifdef DEBUG_STATUS
 printf("| mm_malloc DONE\n");
 #endif
+
   return bp;
 }
 
@@ -281,12 +287,15 @@ printf("| mm_free BEGIN at:%p\n", ptr);
   /* DON't MODIFY THIS STAGE AND LEAVE IT AS IT WAS */
   if (gl_ranges)
     remove_range(gl_ranges, ptr);
+
 #ifdef DEBUG_STATUS
 printf("| mm_free DONE\n");
 #endif
 #ifdef DEBUG
 mm_check();
 #endif
+
+  return;
 }
 
 /*
@@ -545,7 +554,6 @@ printf("| | extend_heap BEGIN -- size:%zu\n", words);
 
   bp = coalesce(bp);
 
-  segregate(bp);
 #ifdef DEBUG
 printf("| | extend_heap DONE\n");
 mm_check();
@@ -562,31 +570,41 @@ static void *coalesce(void *bp) {
 printf("| | | coalesce BEGIN");
 printf(" -- prev_blkp:%p:%c, next_blkp: %p:%c ", PREV_BLKP(bp), BLK_ALLOC_CHAR(PREV_BLKP(bp)), NEXT_BLKP(bp), BLK_ALLOC_CHAR(NEXT_BLKP(bp)));
 #endif
+
   size_t prev_alloc = BLK_ALLOC(PREV_BLKP(bp));
   size_t next_alloc = BLK_ALLOC(NEXT_BLKP(bp));
   size_t size = BLK_SIZE(bp);
 
   if (prev_alloc && next_alloc) { // both not empty
+
 #ifdef DEBUG
 printf("(both not empty)");
 printf(" -- coalesce DONE\n");
 #endif
+
+    segregate(bp);
     return bp;
   }
 
   else if (prev_alloc && !next_alloc) { // next is empty
+
 #ifdef DEBUG
 printf("(next is empty)");
 #endif
+
+    unsegregate(NEXT_BLKP(bp));
     size += BLK_SIZE(NEXT_BLKP(bp));
     PUT(HDRP(bp), PACK(size, 0)); //| A |<-bp|   |
     PUT(FTRP(bp), PACK(size, 0)); //| A | bp | ->|  size is already implemented in HDRP so no need to NEXT_BLKP.
   }
 
   else if (!prev_alloc && next_alloc) { // prev is empty
+
 #ifdef DEBUG
 printf("(prev is empty)");
 #endif
+
+    unsegregate(PREV_BLKP(bp));
     size += BLK_SIZE(PREV_BLKP(bp));
     PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));  //|<- | bp | A |
     PUT(FTRP(bp), PACK(size, 0));             //|<- |bp->| A |
@@ -594,9 +612,13 @@ printf("(prev is empty)");
   }
 
   else { // both are empty
+
 #ifdef DEBUG
 printf("(both are empty)");
 #endif
+
+    unsegregate(NEXT_BLKP(bp));
+    unsegregate(PREV_BLKP(bp));
     size += BLK_SIZE(PREV_BLKP(bp)) + BLK_SIZE(NEXT_BLKP(bp));
     PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0)); //|<- | bp|   |
     PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0)); //|   | bp| ->|
@@ -606,11 +628,13 @@ printf("(both are empty)");
 #ifdef DEBUG
 printf(" -- coalesce DONE\n");
 #endif
+
+  segregate(bp);
   return bp;
 }
 
 /*
- * find_fit - 
+ * find_fit - finds the fitting free block
  */
 static void *find_fit(size_t asize) {
   /* First fit search */
@@ -634,21 +658,24 @@ printf("| | place BEGIN at:%p size:%zu ", bp, asize);
  
   size_t csize = BLK_SIZE(bp);
 
-  if((csize - asize - (2*DSIZE)) >= 0) { //Normal case
+  if((csize > asize + (2*DSIZE))) { //Normal case
     PUT(HDRP(bp), PACK(asize, 1));
     PUT(FTRP(bp), PACK(asize, 1));
     bp = NEXT_BLKP(bp);
     if(csize==asize) return;
     PUT(HDRP(bp), PACK(csize-asize, 0));
     PUT(FTRP(bp), PACK(csize-asize, 0));
+    segregate(bp);
   } else {
     PUT(HDRP(bp), PACK(csize, 1));
     PUT(FTRP(bp), PACK(csize, 1));
   }
+
 #ifdef DEBUG
 printf(" -- place DONE\n");
 mm_check();
 #endif
+
   return;
 }
 
