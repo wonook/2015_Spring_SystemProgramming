@@ -240,7 +240,7 @@ printf("| mm_malloc BEGIN ");
 
   if (size == 0) return NULL;
 
-  if (size <= 2 * DSIZE) asize = 2*DSIZE;
+  if (size <= DSIZE) asize = 3*DSIZE;
   else asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
 
 #ifdef DEBUG
@@ -506,7 +506,7 @@ printf(" -- bp is also tail! -- Unsegregate DONE\n");
 printf(" -- bp is tail!");
 #endif
     prevblock = PREV_FREE_ADDR(bp);
-    if(!(BLK_SIZE(bp) > NOPREVFREE)) for(prevblock = *listblock; GET_TAIL(NEXT_FREE_ADDR(prevblock)) == 0; prevblock = NEXT_FREE_ADDR(prevblock));
+    if(!(BLK_SIZE(bp) > NOPREVFREE)) for(prevblock = *listblock; (NEXT_FREE_ADDR(prevblock)) != bp; prevblock = NEXT_FREE_ADDR(prevblock));
     *HDRP(prevblock) = (*HDRP(prevblock) | 0x2); //set prevblock as tail
     *FTRP(prevblock) = (*FTRP(prevblock) | 0x2);
     NEXT_FREE_ADDR(prevblock) = NULL; //initialize nextaddr of new tail
@@ -515,7 +515,7 @@ printf(" -- bp is tail!");
 printf(" -- bp isn't tail nor root\n");
 #endif
     prevblock = PREV_FREE_ADDR(bp);
-    if(!(BLK_SIZE(bp) > NOPREVFREE)) for(prevblock = *listblock; GET_TAIL(NEXT_FREE_ADDR(prevblock)) == 0; prevblock = NEXT_FREE_ADDR(prevblock));
+    if(!(BLK_SIZE(bp) > NOPREVFREE)) for(prevblock = *listblock; (NEXT_FREE_ADDR(prevblock)) != bp; prevblock = NEXT_FREE_ADDR(prevblock));
     nextblock = NEXT_FREE_ADDR(bp);
     NEXT_FREE_ADDR(prevblock) = nextblock; // prevblock can be defined if size of bp > NOPREVFREE
     if(BLK_SIZE(nextblock) > NOPREVFREE) PREV_FREE_ADDR(nextblock) = prevblock;
@@ -563,7 +563,7 @@ mm_check();
 static void *coalesce(void *bp) {
 #ifdef DEBUG
 printf("| | | coalesce BEGIN");
-printf(" -- prev_blkp:%p:%c, next_blkp: %p:%c ", PREV_BLKP(bp), BLK_ALLOC_CHAR(PREV_BLKP(bp)), NEXT_BLKP(bp), BLK_ALLOC_CHAR(NEXT_BLKP(bp)));
+printf(" -- prev_blkp:%p(%d):%c, next_blkp: %p(%d):%c ", PREV_BLKP(bp), BLK_SIZE(PREV_BLKP(bp)), BLK_ALLOC_CHAR(PREV_BLKP(bp)), NEXT_BLKP(bp), BLK_SIZE(NEXT_BLKP(bp)), BLK_ALLOC_CHAR(NEXT_BLKP(bp)));
 #endif
 
   size_t prev_alloc = BLK_ALLOC(PREV_BLKP(bp));
@@ -596,7 +596,7 @@ printf("(next is empty)");
   else if (!prev_alloc && next_alloc) { // prev is empty
 
 #ifdef DEBUG
-printf("(prev is empty)");
+printf("(prev is empty) \n");
 #endif
 
     unsegregate(PREV_BLKP(bp));
