@@ -235,7 +235,7 @@ printf("| mm_malloc BEGIN ");
   char *bp;
 
   if (heap_listp == 0) 
-    mm_init(NULL); // WARN: not sure if used correctly
+    mm_init(NULL); // WARN
 
   if (size == 0) return NULL;
 
@@ -319,7 +319,8 @@ printf("| mm_exit BEGIN\n");
   void *bp = heap_listp;
 
   for(bp = NEXT_BLKP(bp); BLK_SIZE(bp) > 0; bp = NEXT_BLKP(bp)) {
-    if(BLK_ALLOC(bp)) mm_free(bp);
+    if(BLK_ALLOC(bp))
+      PUT(HDRP(bp), PACK(BLK_SIZE(bp), 0));
   }
 #ifdef DEBUG
 printf("| mm_exit_DONE\n");
@@ -431,7 +432,7 @@ printf("| | | | segregate BEGIN for %p(%d) to %p:%c", bp, BLK_SIZE(bp), listbloc
 if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO SEGREGATE!!");
 #endif
 
-  if(!(LIST_ALLOC(*listblock))) { //if seglist is empty
+  if(*listblock == NULL) { //if seglist is empty
     *listblock = bp;
     PREV_FREE_ADDR(bp) = NULL;
     NEXT_FREE_ADDR(bp) = NULL;
@@ -446,17 +447,19 @@ printf(" -- seglist is empty! segregate DONE: %p, root: %d, tail: %d\n", bp, GET
   char *oldroot;
   oldroot = *listblock; // get the old root
   *listblock = bp; //push the new root onto the seglist
-  (*HDRP(oldroot) = (*HDRP(oldroot) & ~0x4)); //not root anymore
-  (*FTRP(oldroot) = (*FTRP(oldroot) & ~0x4));
-  (*HDRP(bp) = (*HDRP(bp) | 0x4)); //bp as new root
-  (*FTRP(bp) = (*FTRP(bp) | 0x4));
+  *HDRP(oldroot) = (*HDRP(oldroot) & ~0x4); //not root anymore
+  *FTRP(oldroot) = (*FTRP(oldroot) & ~0x4);
+  *HDRP(bp) = (*HDRP(bp) | 0x4); //bp as new root
+  *FTRP(bp) = (*FTRP(bp) | 0x4);
 
   PREV_FREE_ADDR(oldroot) = bp;
   NEXT_FREE_ADDR(bp) = oldroot;
   PREV_FREE_ADDR(bp) = NULL;
+
 #ifdef DEBUG
 printf(" -- segregate DONE\n");
 #endif
+
   return;
 }
 
@@ -473,16 +476,21 @@ printf("| | | | UNsegregate BEGIN for %p(%d) - root:%d, tail:%d ", bp, BLK_SIZE(
   char *nextblock;
 
   if (GET_ROOT(bp)) { //bp is root
+
 #ifdef DEBUG
 printf(" -- bp is root of %p! ", listblock);
 #endif
+
     if(GET_TAIL(bp)) { //both root and tail
+
 #ifdef DEBUG
 printf(" -- bp is also tail! -- Unsegregate DONE\n");
 #endif
+
       *listblock = NULL; // initialize the listblock
       return;
     }
+    //if bp is root
     nextblock = NEXT_FREE_ADDR(bp);
     *listblock = nextblock; // set root of listblock to next free block
     PREV_FREE_ADDR(nextblock) = NULL; //set next block's prev addr as listblock
@@ -495,7 +503,7 @@ printf(" -- bp is tail!");
     prevblock = PREV_FREE_ADDR(bp);
     *HDRP(prevblock) = (*HDRP(prevblock) | 0x2); //set prevblock as tail
     *FTRP(prevblock) = (*FTRP(prevblock) | 0x2);
-    NEXT_FREE_ADDR(prevblock) = 0; //initialize nextaddr of new tail
+    NEXT_FREE_ADDR(prevblock) = NULL; //initialize nextaddr of new tail
   } else {
 #ifdef DEBUG
 printf(" -- bp isn't tail nor root");
@@ -586,9 +594,9 @@ printf("(prev is empty)");
 
     unsegregate(PREV_BLKP(bp));
     size += BLK_SIZE(PREV_BLKP(bp));
-    PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));  //|<- | bp | A |
-    PUT(FTRP(bp), PACK(size, 0));             //|<- |bp->| A |
     bp = PREV_BLKP(bp);
+    PUT(HDRP(bp), PACK(size, 0));  //|<- | bp | A |
+    PUT(FTRP(bp), PACK(size, 0));  //|   |bp->| A |
   }
 
   else { // both are empty
@@ -600,9 +608,9 @@ printf("(both are empty)");
     unsegregate(NEXT_BLKP(bp));
     unsegregate(PREV_BLKP(bp));
     size += BLK_SIZE(PREV_BLKP(bp)) + BLK_SIZE(NEXT_BLKP(bp));
-    PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0)); //|<- | bp|   |
-    PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0)); //|   | bp| ->|
     bp = PREV_BLKP(bp);
+    PUT(HDRP(bp), PACK(size, 0)); //|<- | bp|   |
+    PUT(FTRP(bp), PACK(size, 0)); //|   | bp| ->|
   }
 
 #ifdef DEBUG
@@ -725,19 +733,18 @@ printf("| | place BEGIN at:%p size:%zu ", bp, asize);
  
   size_t csize = BLK_SIZE(bp);
 
+  unsegregate(bp);
+
   if((csize > asize + (2*DSIZE))) { //Normal case
-    unsegregate(bp);
-    PUT(HDRP(bp), FREEPACK(asize, GET_ROOT(bp), GET_TAIL(bp), 1));
-    PUT(FTRP(bp), FREEPACK(asize, GET_ROOT(bp), GET_TAIL(bp), 1));
+    PUT(HDRP(bp), PACK(asize, 1));
+    PUT(FTRP(bp), PACK(asize, 1));
     bp = NEXT_BLKP(bp);
-    if(csize==asize) return;
     PUT(HDRP(bp), PACK(csize-asize, 0));
     PUT(FTRP(bp), PACK(csize-asize, 0));
     segregate(bp);
   } else {
-    unsegregate(bp);
-    PUT(HDRP(bp), FREEPACK(csize, GET_ROOT(bp), GET_TAIL(bp), 1));
-    PUT(FTRP(bp), FREEPACK(csize, GET_ROOT(bp), GET_TAIL(bp), 1));
+    PUT(HDRP(bp), PACK(csize, 1));
+    PUT(FTRP(bp), PACK(csize, 1));
   }
 
 #ifdef DEBUG
