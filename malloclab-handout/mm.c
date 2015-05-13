@@ -50,7 +50,7 @@ static range_t **gl_ranges;
 /* MACROS FROM THE BOOK */
 #define WSIZE 4 // Single wods zie in bytes
 #define DSIZE 8 // Double word size in bytes
-#define CHUNKSIZE (1<<10) //extend the heap by this amount
+#define CHUNKSIZE (1<<4) //extend the heap by this amount
 
 #define MAX(x, y)   ((x) > (y) ? (x) : (y))
 
