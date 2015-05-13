@@ -88,8 +88,6 @@ int mm_check(void);
 void printheap(void);
 void printlist(void);
 
-static size_t uppersize(size_t asize);
-static size_t lowersize(size_t asize);
 static void *segblock(size_t asize);
 static void segregate(void *bp);
 static void unsegregate(void *bp);
@@ -394,60 +392,26 @@ void printlist(void) {
 /*
  * adjustsize - returns adjusted size
  */
-static size_t uppersize(size_t asize) {
-  if(asize <= SIZE2)
-    return asize;
-  else if(asize <= SIZE3)
-    return SIZE2 * ((asize + (SIZE2-1)) / SIZE2);
-  else if(asize <= SIZE4)
-    return SIZE3 * ((asize + (SIZE3-1)) / SIZE3);
-  else if(asize <= SIZE5)
-    return SIZE4 * ((asize + (SIZE4-1)) / SIZE4);
-  else if(asize <= SIZE6)
-    return SIZE5 * ((asize + (SIZE5-1)) / SIZE5);
-  else if(asize <= SIZE7)
-    return SIZE6 * ((asize + (SIZE6-1)) / SIZE6);
-  else
-    return asize;
-}
-
-static size_t lowersize(size_t asize) {
-  if(asize <= SIZE2)
-    return asize;
-  else if(asize <= SIZE3)
-    return SIZE2 * (asize / SIZE2);
-  else if(asize <= SIZE4)
-    return SIZE3 * (asize / SIZE3);
-  else if(asize <= SIZE5)
-    return SIZE4 * (asize / SIZE4);
-  else if(asize <= SIZE6)
-    return SIZE5 * (asize / SIZE5);
-  else if(asize <= SIZE7)
-    return SIZE6 * (asize / SIZE6);
-  else
-    return asize;
-}
-
 static void *segblock(size_t asize) {
   int i;
   char *result;
   if(asize < SIZE2) {
-    for(i=5; asize < SIZE1+(i*DSIZE); --i);
+    for(i=5; asize < SIZE1+(i*(SIZE1/2)); --i);
     result = LIST_PTR(list1, i);
   } else if(asize < SIZE3) {
-    for(i=5; asize < SIZE2+(i*SIZE2); --i);
+    for(i=5; asize < SIZE2+(i*(SIZE2/2)); --i);
     result = LIST_PTR(list2, i);
   } else if(asize < SIZE4) {
-    for(i=5; asize < SIZE3+(i*SIZE3); --i);
+    for(i=5; asize < SIZE3+(i*(SIZE3/2)); --i);
     result = LIST_PTR(list3, i);
   } else if(asize < SIZE5) {
-    for(i=5; asize < SIZE4+(i*SIZE4); --i);
+    for(i=5; asize < SIZE4+(i*(SIZE4/2)); --i);
     result = LIST_PTR(list4, i);
   } else if(asize < SIZE6) {
-    for(i=5; asize < SIZE5+(i*SIZE5); --i);
+    for(i=5; asize < SIZE5+(i*(SIZE5/2)); --i);
     result = LIST_PTR(list5, i);
   } else if(asize < SIZE7) {
-    for(i=5; asize < SIZE6+(i*SIZE6); --i);
+    for(i=5; asize < SIZE6+(i*(SIZE6/2)); --i);
     result = LIST_PTR(list6, i);
   } else {
     result = LIST_PTR(list6, 5); //last one
@@ -470,6 +434,7 @@ if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO SEGREGATE!!");
   if(!(LIST_ALLOC(*listblock))) { //if seglist is empty
     *listblock = bp;
     PREV_FREE_ADDR(bp) = listblock;
+    NEXT_FREE_ADDR(bp) = NULL;
     PUT(HDRP(bp), FREEPACK(size, 4, 2, 0));
     PUT(FTRP(bp), FREEPACK(size, 4, 2, 0));
 #ifdef DEBUG
@@ -501,7 +466,6 @@ printf(" -- segregate DONE\n");
 static void unsegregate(void *bp) {
 #ifdef DEBUG
 printf("| | | | UNsegregate BEGIN for %p(%d) - root:%d, tail:%d ", bp, BLK_SIZE(bp), GET_ROOT(bp), GET_TAIL(bp));
-if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO UNSEGREGATE!!");
 #endif
 
   char **listblock;
@@ -510,14 +474,14 @@ if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO UNSEGREGATE!!");
 
   if (GET_ROOT(bp)) { //bp is root
 #ifdef DEBUG
-printf(" -- bp is root!\n");
+printf(" -- bp is root!");
 #endif
     listblock = PREV_FREE_ADDR(bp);
     if(GET_TAIL(bp)) { //both root and tail
 #ifdef DEBUG
 printf(" -- bp is also tail!");
 #endif
-      PUT(*listblock, 0); // initialize the listblock
+      *listblock = NULL; // initialize the listblock
       return;
     }
     nextblock = NEXT_FREE_ADDR(bp);
@@ -666,9 +630,10 @@ printf(" -- list is NULL -- end findlist\n");
     return NULL;
   }
 
-  for(bp = *listblock; GET_TAIL(bp) != 0; bp = NEXT_FREE_ADDR(bp)) {
+  closestblock = *listblock;
+  for(bp = *listblock; GET_TAIL(bp) != 0 && NEXT_FREE_ADDR(bp) != NULL; bp = NEXT_FREE_ADDR(bp)) {
     if(BLK_SIZE(bp) > asize) {
-      if(closestblock == 0 || (BLK_SIZE(closestblock) > BLK_SIZE(bp))) {
+      if(BLK_SIZE(closestblock) > BLK_SIZE(bp)) {
         closestblock = bp;
       }
     }
@@ -685,7 +650,7 @@ static void *find_smallest_from_list(char **listblock) {
 printf("| | | | | find_smallest_from_list: %p(%p)\n", listblock, *listblock);
 #endif
   char *bp = 0;
-  char *smallestblock = 0;
+  char *smallestblock = NULL;
 
   if(listblock == LIST_PTR(list6, 6)) {
 #ifdef DEBUG
@@ -701,8 +666,9 @@ printf(" -- searching next list..\n");
     return find_smallest_from_list(++listblock);
   }
 
-  for(bp = *listblock; GET_TAIL(bp) != 0; bp = NEXT_FREE_ADDR(bp)) {
-    if(smallestblock == 0 || (BLK_SIZE(bp) < BLK_SIZE(smallestblock)))
+  smallestblock = *listblock;
+  for(bp = *listblock; GET_TAIL(bp) != 0 && NEXT_FREE_ADDR(bp) != NULL; bp = NEXT_FREE_ADDR(bp)) {
+    if(BLK_SIZE(bp) < BLK_SIZE(smallestblock))
       smallestblock = bp;
   }
 
@@ -729,8 +695,7 @@ static void *find_fit(size_t asize) {
 printf("| | | | find_fit BEGIN\n");
 #endif
 
-  char **listblock;
-  *listblock = (segblock(asize)); // get where to put this free block
+  char **listblock = (segblock(asize)); // get where to put this free block
   char *closestblock = NULL;
 
   //search smaller blocks
