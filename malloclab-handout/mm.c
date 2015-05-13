@@ -661,7 +661,7 @@ printf("| | | | | find_from_list: %p(%p)\n", listblock, *listblock);
 
   if(*listblock == NULL) {
 #ifdef DEBUG
-printf(" -- list is NULL -- end find\n");
+printf(" -- list is NULL -- end findlist\n");
 #endif
     return NULL;
   }
@@ -698,12 +698,11 @@ printf(" -- reached end of the blocks -- can't find\n");
 #ifdef DEBUG
 printf(" -- searching next list..\n");
 #endif
-    return find_smallest_from_list(LIST_PTR(listblock, 1));
+    return find_smallest_from_list(++listblock);
   }
-printf("hello!\n");
 
   for(bp = *listblock; GET_TAIL(bp) != 0; bp = NEXT_FREE_ADDR(bp)) {
-    if(smallestblock = 0 || (BLK_SIZE(bp) < BLK_SIZE(smallestblock)))
+    if(smallestblock == 0 || (BLK_SIZE(bp) < BLK_SIZE(smallestblock)))
       smallestblock = bp;
   }
 
@@ -730,18 +729,15 @@ static void *find_fit(size_t asize) {
 printf("| | | | find_fit BEGIN\n");
 #endif
 
-  char **listblock  = (segblock(asize)); // get where to put this free block
-  char *closestblock = 0;
-
-  if(*listblock == NULL) {
-    find_smallest_from_list(listblock + 0x4);
-  }
+  char **listblock;
+  *listblock = (segblock(asize)); // get where to put this free block
+  char *closestblock = NULL;
 
   //search smaller blocks
   closestblock = find_from_list(asize, listblock);
 
   if(closestblock == NULL)
-    closestblock = find_smallest_from_list(listblock + WSIZE);
+    closestblock = find_smallest_from_list(++listblock);
 
 #ifdef DEBUG
 if(closestblock != NULL)
