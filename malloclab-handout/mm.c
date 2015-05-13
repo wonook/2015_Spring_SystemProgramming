@@ -274,7 +274,7 @@ void mm_free(void *ptr)
 {
   /* YOUR IMPLEMENTATION */
 #ifdef DEBUG_STATUS
-printf("| mm_free BEGIN at:%p\n", ptr);
+printf("| mm_free BEGIN at:%p(%d)\n", ptr, BLK_SIZE(ptr));
 #endif
   size_t size = BLK_SIZE(ptr);
 
@@ -433,7 +433,7 @@ if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO SEGREGATE!!");
 
   if(!(LIST_ALLOC(*listblock))) { //if seglist is empty
     *listblock = bp;
-    PREV_FREE_ADDR(bp) = listblock;
+    PREV_FREE_ADDR(bp) = NULL;
     NEXT_FREE_ADDR(bp) = NULL;
     PUT(HDRP(bp), FREEPACK(size, 4, 2, 0));
     PUT(FTRP(bp), FREEPACK(size, 4, 2, 0));
@@ -453,7 +453,7 @@ printf(" -- seglist is empty! segregate DONE: %p, root: %d, tail: %d\n", bp, GET
 
   PREV_FREE_ADDR(oldroot) = bp;
   NEXT_FREE_ADDR(bp) = oldroot;
-  PREV_FREE_ADDR(bp) = listblock;
+  PREV_FREE_ADDR(bp) = NULL;
 #ifdef DEBUG
 printf(" -- segregate DONE\n");
 #endif
@@ -468,25 +468,24 @@ static void unsegregate(void *bp) {
 printf("| | | | UNsegregate BEGIN for %p(%d) - root:%d, tail:%d ", bp, BLK_SIZE(bp), GET_ROOT(bp), GET_TAIL(bp));
 #endif
 
-  char **listblock;
+  char **listblock = segblock(BLK_SIZE(bp));
   char *prevblock;
   char *nextblock;
 
   if (GET_ROOT(bp)) { //bp is root
 #ifdef DEBUG
-printf(" -- bp is root!");
+printf(" -- bp is root of %p! ", listblock);
 #endif
-    listblock = PREV_FREE_ADDR(bp);
     if(GET_TAIL(bp)) { //both root and tail
 #ifdef DEBUG
-printf(" -- bp is also tail!");
+printf(" -- bp is also tail! -- Unsegregate DONE\n");
 #endif
       *listblock = NULL; // initialize the listblock
       return;
     }
     nextblock = NEXT_FREE_ADDR(bp);
     *listblock = nextblock; // set root of listblock to next free block
-    PREV_FREE_ADDR(nextblock) = listblock; //set next block's prev addr as listblock
+    PREV_FREE_ADDR(nextblock) = NULL; //set next block's prev addr as listblock
     *HDRP(nextblock) = (*HDRP(nextblock) | 0x4); //set next block as root
     *FTRP(nextblock) = (*FTRP(nextblock) | 0x4);
   } else if (GET_TAIL(bp)) { //bp is tail
@@ -549,7 +548,7 @@ mm_check();
 static void *coalesce(void *bp) {
 #ifdef DEBUG
 printf("| | | coalesce BEGIN");
-printf(" -- prev_blkp:%p:%c, next_blkp: %p:%c ", PREV_BLKP(bp), BLK_ALLOC_CHAR(PREV_BLKP(bp)), NEXT_BLKP(bp), BLK_ALLOC_CHAR(NEXT_BLKP(bp)));
+printf(" -- prev_blkp:%p:%c, next_blkp: %p:%c", PREV_BLKP(bp), BLK_ALLOC_CHAR(PREV_BLKP(bp)), NEXT_BLKP(bp), BLK_ALLOC_CHAR(NEXT_BLKP(bp)));
 #endif
 
   size_t prev_alloc = BLK_ALLOC(PREV_BLKP(bp));
@@ -617,7 +616,7 @@ printf(" -- coalesce DONE\n");
 /**/
 static void *find_from_list(size_t asize, char **listblock) {
 #ifdef DEBUG
-printf("| | | | | find_from_list: %p(%p)\n", listblock, *listblock);
+printf("| | | | | find_from_list: %p(%p) ", listblock, *listblock);
 #endif
 
   char *bp = 0;
@@ -649,7 +648,7 @@ printf(" -- found block! : %p\n", closestblock);
 /**/
 static void *find_smallest_from_list(char **listblock) {
 #ifdef DEBUG
-printf("| | | | | find_smallest_from_list: %p(%p)\n", listblock, *listblock);
+printf("| | | | | find_smallest_from_list: %p(%p)", listblock, *listblock);
 #endif
   char *bp = 0;
   char *smallestblock = NULL;
@@ -727,18 +726,18 @@ printf("| | place BEGIN at:%p size:%zu ", bp, asize);
   size_t csize = BLK_SIZE(bp);
 
   if((csize > asize + (2*DSIZE))) { //Normal case
+    unsegregate(bp);
     PUT(HDRP(bp), FREEPACK(asize, GET_ROOT(bp), GET_TAIL(bp), 1));
     PUT(FTRP(bp), FREEPACK(asize, GET_ROOT(bp), GET_TAIL(bp), 1));
-    unsegregate(bp);
     bp = NEXT_BLKP(bp);
     if(csize==asize) return;
     PUT(HDRP(bp), PACK(csize-asize, 0));
     PUT(FTRP(bp), PACK(csize-asize, 0));
     segregate(bp);
   } else {
+    unsegregate(bp);
     PUT(HDRP(bp), FREEPACK(csize, GET_ROOT(bp), GET_TAIL(bp), 1));
     PUT(FTRP(bp), FREEPACK(csize, GET_ROOT(bp), GET_TAIL(bp), 1));
-    unsegregate(bp);
   }
 
 #ifdef DEBUG
