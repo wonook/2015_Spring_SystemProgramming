@@ -50,7 +50,7 @@ static range_t **gl_ranges;
 /* MACROS FROM THE BOOK */
 #define WSIZE 4 // Single wods zie in bytes
 #define DSIZE 8 // Double word size in bytes
-#define CHUNKSIZE (1<<6) //extend the heap by this amount
+#define CHUNKSIZE (1<<10) //extend the heap by this amount
 
 #define MAX(x, y)   ((x) > (y) ? (x) : (y))
 
@@ -132,7 +132,7 @@ static char *list6; //2**14:16384,24576,32768,40960,49152,else
 #define GET_ROOT(bp) (GET(HDRP(bp)) & 0x4) // sees if the free block is seglist ROOT
 #define GET_TAIL(bp) (GET(HDRP(bp)) & 0x2) // sees if the free block is seglist TAIL
 
-#define FREEPACK(addr, root, tail, alloc) ((size)|4*(root)|2*(tail)|(alloc)) // packs information for the header/footer of the free block
+#define FREEPACK(size, root, tail, alloc) ((size)|(root)|(tail)|(alloc)) // packs information for the header/footer of the free block
 
 #define NEXT_FREE_ADDR(bp) (*(char **)(bp)) // gets address of next free block on the list
 #define PREV_FREE_ADDR(bp) (*((char **)(bp) + WSIZE)) // gets address of previous free block on the list
@@ -468,13 +468,13 @@ if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO SEGREGATE!!");
 #endif
 
   if(!(LIST_ALLOC(*listblock))) { //if seglist is empty
-#ifdef DEBUG
-printf(" -- seglist is empty! segregate DONE\n");
-#endif
     *listblock = bp;
     PREV_FREE_ADDR(bp) = listblock;
-    PUT(HDRP(bp), FREEPACK(size, 1, 1, 0));
-    PUT(FTRP(bp), FREEPACK(size, 1, 1, 0));
+    PUT(HDRP(bp), FREEPACK(size, 4, 2, 0));
+    PUT(FTRP(bp), FREEPACK(size, 4, 2, 0));
+#ifdef DEBUG
+printf(" -- seglist is empty! segregate DONE: %p, root: %d, tail: %d\n", bp, GET_ROOT(bp), GET_TAIL(bp));
+#endif
     return;
   }
 
@@ -500,6 +500,7 @@ printf(" -- segregate DONE\n");
  */
 static void unsegregate(void *bp) {
 #ifdef DEBUG
+printf("| | | | UNsegregate BEGIN for %p(%d) - root:%d, tail:%d ", bp, BLK_SIZE(bp), GET_ROOT(bp), GET_TAIL(bp));
 if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO UNSEGREGATE!!");
 #endif
 
@@ -508,8 +509,14 @@ if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO UNSEGREGATE!!");
   char *nextblock;
 
   if (GET_ROOT(bp)) { //bp is root
+#ifdef DEBUG
+printf(" -- bp is root!\n");
+#endif
     listblock = PREV_FREE_ADDR(bp);
     if(GET_TAIL(bp)) { //both root and tail
+#ifdef DEBUG
+printf(" -- bp is also tail!");
+#endif
       PUT(*listblock, 0); // initialize the listblock
       return;
     }
@@ -519,16 +526,26 @@ if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO UNSEGREGATE!!");
     *HDRP(nextblock) = (*HDRP(nextblock) | 0x4); //set next block as root
     *FTRP(nextblock) = (*FTRP(nextblock) | 0x4);
   } else if (GET_TAIL(bp)) { //bp is tail
+#ifdef DEBUG
+printf(" -- bp is tail!");
+#endif
     prevblock = PREV_FREE_ADDR(bp);
     *HDRP(prevblock) = (*HDRP(prevblock) | 0x2); //set prevblock as tail
     *FTRP(prevblock) = (*FTRP(prevblock) | 0x2);
     NEXT_FREE_ADDR(prevblock) = 0; //initialize nextaddr of new tail
   } else {
+#ifdef DEBUG
+printf(" -- bp isn't tail nor root");
+#endif
     prevblock = PREV_FREE_ADDR(bp);
     nextblock = NEXT_FREE_ADDR(bp);
     NEXT_FREE_ADDR(prevblock) = nextblock;
     PREV_FREE_ADDR(nextblock) = prevblock;
   }
+#ifdef DEBUG
+printf(" -- UNsegregation DONE\n");
+#endif
+  return;
 }
 
 /*
@@ -633,19 +650,107 @@ printf(" -- coalesce DONE\n");
   return bp;
 }
 
+/**/
+static void *find_from_list(size_t asize, char **listblock) {
+#ifdef DEBUG
+printf("| | | | | find_from_list: %p(%p)\n", listblock, *listblock);
+#endif
+
+  char *bp = 0;
+  char *closestblock = NULL;
+
+  if(*listblock == NULL) {
+#ifdef DEBUG
+printf(" -- list is NULL -- end find\n");
+#endif
+    return NULL;
+  }
+
+  for(bp = *listblock; GET_TAIL(bp) != 0; bp = NEXT_FREE_ADDR(bp)) {
+    if(BLK_SIZE(bp) > asize) {
+      if(closestblock == 0 || (BLK_SIZE(closestblock) > BLK_SIZE(bp))) {
+        closestblock = bp;
+      }
+    }
+  }
+#ifdef DEBUG
+printf(" -- found block! : %p\n", closestblock);
+#endif
+  return closestblock;
+}
+
+/**/
+static void *find_smallest_from_list(char **listblock) {
+#ifdef DEBUG
+printf("| | | | | find_smallest_from_list: %p(%p)\n", listblock, *listblock);
+#endif
+  char *bp = 0;
+  char *smallestblock = 0;
+
+  if(listblock == LIST_PTR(list6, 6)) {
+#ifdef DEBUG
+printf(" -- reached end of the blocks -- can't find\n");
+#endif
+    return NULL;
+  }
+
+  if(*listblock == NULL) {
+#ifdef DEBUG
+printf(" -- searching next list..\n");
+#endif
+    return find_smallest_from_list(LIST_PTR(listblock, 1));
+  }
+printf("hello!\n");
+
+  for(bp = *listblock; GET_TAIL(bp) != 0; bp = NEXT_FREE_ADDR(bp)) {
+    if(smallestblock = 0 || (BLK_SIZE(bp) < BLK_SIZE(smallestblock)))
+      smallestblock = bp;
+  }
+
+#ifdef DEBUG
+printf(" -- found block! : %p\n", smallestblock);
+#endif
+  return smallestblock;
+}
+
 /*
  * find_fit - finds the fitting free block
  */
 static void *find_fit(size_t asize) {
-  /* First fit search */
-  void *bp = 0;
+  // /* First fit search */
+  // void *bp = 0;
 
-  for(bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
-    if(!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
-      return bp;
-    }
+  // for(bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+  //   if(!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
+  //     return bp;
+  //   }
+  // }
+  // return NULL;
+#ifdef DEBUG
+printf("| | | | find_fit BEGIN\n");
+#endif
+
+  char **listblock  = (segblock(asize)); // get where to put this free block
+  char *closestblock = 0;
+
+  if(*listblock == NULL) {
+    find_smallest_from_list(listblock + 0x4);
   }
-  return NULL;
+
+  //search smaller blocks
+  closestblock = find_from_list(asize, listblock);
+
+  if(closestblock == NULL)
+    closestblock = find_smallest_from_list(listblock + WSIZE);
+
+#ifdef DEBUG
+if(closestblock != NULL)
+  printf(" -- find_fit END:%p(%d) \n", closestblock, BLK_SIZE(closestblock));
+else
+  printf(" -- find_fit END:(nil) \n");
+#endif
+
+  return closestblock;
 }
 
 /*
@@ -659,16 +764,18 @@ printf("| | place BEGIN at:%p size:%zu ", bp, asize);
   size_t csize = BLK_SIZE(bp);
 
   if((csize > asize + (2*DSIZE))) { //Normal case
-    PUT(HDRP(bp), PACK(asize, 1));
-    PUT(FTRP(bp), PACK(asize, 1));
+    PUT(HDRP(bp), FREEPACK(asize, GET_ROOT(bp), GET_TAIL(bp), 1));
+    PUT(FTRP(bp), FREEPACK(asize, GET_ROOT(bp), GET_TAIL(bp), 1));
+    unsegregate(bp);
     bp = NEXT_BLKP(bp);
     if(csize==asize) return;
     PUT(HDRP(bp), PACK(csize-asize, 0));
     PUT(FTRP(bp), PACK(csize-asize, 0));
     segregate(bp);
   } else {
-    PUT(HDRP(bp), PACK(csize, 1));
-    PUT(FTRP(bp), PACK(csize, 1));
+    PUT(HDRP(bp), FREEPACK(csize, GET_ROOT(bp), GET_TAIL(bp), 1));
+    PUT(FTRP(bp), FREEPACK(csize, GET_ROOT(bp), GET_TAIL(bp), 1));
+    unsegregate(bp);
   }
 
 #ifdef DEBUG
