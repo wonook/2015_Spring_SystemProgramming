@@ -630,10 +630,12 @@ printf(" -- list is NULL -- end findlist\n");
     return NULL;
   }
 
-  closestblock = *listblock;
+  if(BLK_SIZE(*listblock) > asize)
+    closestblock = *listblock;
+
   for(bp = *listblock; GET_TAIL(bp) != 0 && NEXT_FREE_ADDR(bp) != NULL; bp = NEXT_FREE_ADDR(bp)) {
     if(BLK_SIZE(bp) > asize) {
-      if(BLK_SIZE(closestblock) > BLK_SIZE(bp)) {
+      if(closestblock == NULL || BLK_SIZE(closestblock) > BLK_SIZE(bp)) {
         closestblock = bp;
       }
     }
