@@ -106,8 +106,8 @@ static char *list5; //2**12:4096, 6144, 8192, 10240,12288,14336
 static char *list6; //2**14:16384,24576,32768,40960,49152,else
 
 /* OWN MACROS */
-#define DEBUG //for debugging
-#define DEBUG_STATUS
+//#define DEBUG //for debugging
+//#define DEBUG_STATUS
 
 #define BLK_SIZE(bp) (GET_SIZE(HDRP(bp)))
 #define BLK_ALLOC(bp) (GET_ALLOC(HDRP(bp)))
@@ -136,6 +136,7 @@ static char *list6; //2**14:16384,24576,32768,40960,49152,else
 #define PREV_FREE_ADDR(bp) (*((char **)(bp) + WSIZE)) // gets address of previous free block on the list
 #define SET_NEXT_FREE_ADDR(bp, addr) ((NEXT_FREE_ADDR(bp)) = addr) // assign address of next free block
 #define SET_PREV_FREE_ADDR(bp, addr) ((PREV_FREE_ADDR(bp)) = addr)
+#define NOPREVFREE 40
 
 
 /* 
@@ -239,7 +240,7 @@ printf("| mm_malloc BEGIN ");
 
   if (size == 0) return NULL;
 
-  if (size <= DSIZE) asize = 2*DSIZE;
+  if (size <= 2 * DSIZE) asize = 2*DSIZE;
   else asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
 
 #ifdef DEBUG
@@ -317,11 +318,14 @@ void mm_exit(void)
 printf("| mm_exit BEGIN\n");
 #endif
   void *bp = heap_listp;
+  size_t totalsize = 0;
 
   for(bp = NEXT_BLKP(bp); BLK_SIZE(bp) > 0; bp = NEXT_BLKP(bp)) {
-    if(BLK_ALLOC(bp))
-      PUT(HDRP(bp), PACK(BLK_SIZE(bp), 0));
+    totalsize += BLK_SIZE(bp);
+    remove_range(gl_ranges, bp);
   }
+  PUT(HDRP(heap_listp), PACK(totalsize, 0));
+  PUT(FTRP(heap_listp), PACK(totalsize, 0));
 #ifdef DEBUG
 printf("| mm_exit_DONE\n");
 mm_check();
@@ -351,6 +355,7 @@ void printheap(void) {
   for(bp = heap_listp; BLK_SIZE(bp) > 0; bp = NEXT_BLKP(bp)) {
     size = (BLK_SIZE(bp));
     printf("| %p:%zu%2c |", bp, size, BLK_ALLOC_CHAR(bp));
+    if(*HDRP(bp) != *FTRP(bp)) printf("==FATAL: HDR AND FTR DOESN'T MATCH: %p==", bp);
   }
   size = (BLK_SIZE(bp));
   printf("| %p:%zu%2c |\n", bp, size, BLK_ALLOC_CHAR(bp));
@@ -428,13 +433,13 @@ static void segregate(void *bp) {
   char **listblock = (segblock(size)); // get where to put this free block
 
 #ifdef DEBUG
-printf("| | | | segregate BEGIN for %p(%d) to %p:%c", bp, BLK_SIZE(bp), listblock, LIST_ALLOC_CHAR(*listblock));
+printf("| | | | segregate BEGIN for %p(%d=%d) to %p:%c", bp, BLK_SIZE(bp), GET_SIZE(FTRP(bp)), listblock, LIST_ALLOC_CHAR(*listblock));
 if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO SEGREGATE!!");
 #endif
 
   if(*listblock == NULL) { //if seglist is empty
     *listblock = bp;
-    PREV_FREE_ADDR(bp) = NULL;
+    if(BLK_SIZE(bp) > NOPREVFREE) PREV_FREE_ADDR(bp) = NULL;
     NEXT_FREE_ADDR(bp) = NULL;
     PUT(HDRP(bp), FREEPACK(size, 4, 2, 0));
     PUT(FTRP(bp), FREEPACK(size, 4, 2, 0));
@@ -447,17 +452,17 @@ printf(" -- seglist is empty! segregate DONE: %p, root: %d, tail: %d\n", bp, GET
   char *oldroot;
   oldroot = *listblock; // get the old root
   *listblock = bp; //push the new root onto the seglist
-  *HDRP(oldroot) = (*HDRP(oldroot) & ~0x4); //not root anymore
-  *FTRP(oldroot) = (*FTRP(oldroot) & ~0x4);
-  *HDRP(bp) = (*HDRP(bp) | 0x4); //bp as new root
-  *FTRP(bp) = (*FTRP(bp) | 0x4);
+  PUT(HDRP(oldroot), FREEPACK(BLK_SIZE(oldroot), 0, GET_TAIL(oldroot), 0)); // not root anymore
+  PUT(FTRP(oldroot), FREEPACK(BLK_SIZE(oldroot), 0, GET_TAIL(oldroot), 0));
+  PUT(HDRP(bp), FREEPACK(size, 4, 0, 0)); //bp as new root
+  PUT(FTRP(bp), FREEPACK(size, 4, 0, 0));
 
-  PREV_FREE_ADDR(oldroot) = bp;
+  if(BLK_SIZE(oldroot) > NOPREVFREE) PREV_FREE_ADDR(oldroot) = bp;
   NEXT_FREE_ADDR(bp) = oldroot;
-  PREV_FREE_ADDR(bp) = NULL;
+  if(BLK_SIZE(bp) > NOPREVFREE) PREV_FREE_ADDR(bp) = NULL;
 
 #ifdef DEBUG
-printf(" -- segregate DONE\n");
+printf(" -- segregate DONE for (%d=%d)\n", BLK_SIZE(bp), GET_SIZE(FTRP(bp)));
 #endif
 
   return;
@@ -467,13 +472,13 @@ printf(" -- segregate DONE\n");
  * unsegregate-
  */
 static void unsegregate(void *bp) {
-#ifdef DEBUG
-printf("| | | | UNsegregate BEGIN for %p(%d) - root:%d, tail:%d ", bp, BLK_SIZE(bp), GET_ROOT(bp), GET_TAIL(bp));
-#endif
-
   char **listblock = segblock(BLK_SIZE(bp));
   char *prevblock;
   char *nextblock;
+
+#ifdef DEBUG
+printf("| | | | UNsegregate BEGIN for %p(%d) - root:%d, tail:%d at %p ", bp, BLK_SIZE(bp), GET_ROOT(bp), GET_TAIL(bp), listblock);
+#endif
 
   if (GET_ROOT(bp)) { //bp is root
 
@@ -493,7 +498,7 @@ printf(" -- bp is also tail! -- Unsegregate DONE\n");
     //if bp is root
     nextblock = NEXT_FREE_ADDR(bp);
     *listblock = nextblock; // set root of listblock to next free block
-    PREV_FREE_ADDR(nextblock) = NULL; //set next block's prev addr as listblock
+    if(BLK_SIZE(nextblock) > NOPREVFREE) PREV_FREE_ADDR(nextblock) = NULL; //set next block's prev addr as listblock
     *HDRP(nextblock) = (*HDRP(nextblock) | 0x4); //set next block as root
     *FTRP(nextblock) = (*FTRP(nextblock) | 0x4);
   } else if (GET_TAIL(bp)) { //bp is tail
@@ -501,17 +506,19 @@ printf(" -- bp is also tail! -- Unsegregate DONE\n");
 printf(" -- bp is tail!");
 #endif
     prevblock = PREV_FREE_ADDR(bp);
+    if(!(BLK_SIZE(bp) > NOPREVFREE)) for(prevblock = *listblock; GET_TAIL(NEXT_FREE_ADDR(prevblock)) == 0; prevblock = NEXT_FREE_ADDR(prevblock));
     *HDRP(prevblock) = (*HDRP(prevblock) | 0x2); //set prevblock as tail
     *FTRP(prevblock) = (*FTRP(prevblock) | 0x2);
     NEXT_FREE_ADDR(prevblock) = NULL; //initialize nextaddr of new tail
   } else {
 #ifdef DEBUG
-printf(" -- bp isn't tail nor root");
+printf(" -- bp isn't tail nor root\n");
 #endif
     prevblock = PREV_FREE_ADDR(bp);
+    if(!(BLK_SIZE(bp) > NOPREVFREE)) for(prevblock = *listblock; GET_TAIL(NEXT_FREE_ADDR(prevblock)) == 0; prevblock = NEXT_FREE_ADDR(prevblock));
     nextblock = NEXT_FREE_ADDR(bp);
-    NEXT_FREE_ADDR(prevblock) = nextblock;
-    PREV_FREE_ADDR(nextblock) = prevblock;
+    NEXT_FREE_ADDR(prevblock) = nextblock; // prevblock can be defined if size of bp > NOPREVFREE
+    if(BLK_SIZE(nextblock) > NOPREVFREE) PREV_FREE_ADDR(nextblock) = prevblock;
   }
 #ifdef DEBUG
 printf(" -- UNsegregation DONE\n");
@@ -556,7 +563,7 @@ mm_check();
 static void *coalesce(void *bp) {
 #ifdef DEBUG
 printf("| | | coalesce BEGIN");
-printf(" -- prev_blkp:%p:%c, next_blkp: %p:%c", PREV_BLKP(bp), BLK_ALLOC_CHAR(PREV_BLKP(bp)), NEXT_BLKP(bp), BLK_ALLOC_CHAR(NEXT_BLKP(bp)));
+printf(" -- prev_blkp:%p:%c, next_blkp: %p:%c ", PREV_BLKP(bp), BLK_ALLOC_CHAR(PREV_BLKP(bp)), NEXT_BLKP(bp), BLK_ALLOC_CHAR(NEXT_BLKP(bp)));
 #endif
 
   size_t prev_alloc = BLK_ALLOC(PREV_BLKP(bp));
@@ -728,7 +735,7 @@ else
  */
 static void place(void *bp, size_t asize) {
 #ifdef DEBUG
-printf("| | place BEGIN at:%p size:%zu ", bp, asize);
+printf("| | place BEGIN at:%p(%d) size:%zu", bp, BLK_SIZE(bp), asize);
 #endif
  
   size_t csize = BLK_SIZE(bp);
