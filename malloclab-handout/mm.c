@@ -243,8 +243,10 @@ mm_check();
 
 /*
  * mm_malloc - Allocate a block by finding an adequate free block.
- * extend the heap if no such block exists.
- * Always allocate a block whose size is a multiple of the alignment.
+ * Extend the heap if no such block exists.
+ * Note that it only extends the amount it HAS to extend by adding up 
+ * the size of the free block just before the epilogue block.
+ * It always allocates a block whose size is a multiple of the alignment.
  */
 void* mm_malloc(size_t size)
 {
