@@ -104,10 +104,12 @@ static char *list3; //2**8: 256,  384,  512,  640,  768,  896
 static char *list4; //2**10:1024, 1536, 2048, 2560, 3072, 3584
 static char *list5; //2**12:4096, 6144, 8192, 10240,12288,14336
 static char *list6; //2**14:16384,24576,32768,40960,49152,else
+static char *lastblock = 0;
 
 /* OWN MACROS */
 //#define DEBUG //for debugging
 //#define DEBUG_STATUS
+//#define DEBUG_LIST
 
 #define BLK_SIZE(bp) (GET_SIZE(HDRP(bp)))
 #define BLK_ALLOC(bp) (GET_ALLOC(HDRP(bp)))
@@ -199,6 +201,7 @@ printf("\n\n| mm_init BEGIN\n");
   PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1));
   PUT(heap_listp + (3*WSIZE), PACK(0, 1));
   heap_listp += (2*WSIZE); // Middle of prologue block
+  lastblock = heap_listp + WSIZE;
 
 #ifdef DEBUG
 mm_check();
@@ -232,7 +235,7 @@ printf("| mm_malloc BEGIN ");
 #endif
 
   size_t asize;
-  size_t extendsize;
+  size_t extendsize = 0;
   char *bp;
 
   if (heap_listp == 0) 
@@ -241,7 +244,7 @@ printf("| mm_malloc BEGIN ");
   if (size == 0) return NULL;
 
   if (size <= DSIZE) asize = 3*DSIZE;
-  else asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
+  else asize = DSIZE * ((size + DSIZE + (DSIZE-1)) / DSIZE);
 
 #ifdef DEBUG
 printf(" -- size: %zu, adjusted size: %zu \n", size, asize);
@@ -251,13 +254,15 @@ printf(" -- size: %zu, adjusted size: %zu \n", size, asize);
     place(bp, asize);
 
 #ifdef DEBUG
-printf("| mm_malloc DONE\n");
+printf("| mm_malloc DONE!\n");
 #endif
 
     return bp;
   }
 
-  extendsize = MAX(asize, CHUNKSIZE);
+  if(!(BLK_ALLOC(PREV_BLKP(lastblock))))
+    extendsize = BLK_SIZE(PREV_BLKP(lastblock));
+  extendsize = MAX(asize - extendsize, CHUNKSIZE);
   if((bp = extend_heap(extendsize/WSIZE)) == NULL) return NULL;
   place(bp, asize);
 
@@ -321,11 +326,10 @@ printf("| mm_exit BEGIN\n");
   size_t totalsize = 0;
 
   for(bp = NEXT_BLKP(bp); BLK_SIZE(bp) > 0; bp = NEXT_BLKP(bp)) {
-    totalsize += BLK_SIZE(bp);
-    remove_range(gl_ranges, bp);
+    if(BLK_ALLOC(bp)) {
+      mm_free(bp);
+    }
   }
-  PUT(HDRP(heap_listp), PACK(totalsize, 0));
-  PUT(FTRP(heap_listp), PACK(totalsize, 0));
 #ifdef DEBUG
 printf("| mm_exit_DONE\n");
 mm_check();
@@ -340,7 +344,9 @@ mm_check();
  */
 int mm_check(void) {
   printheap();
+#ifdef DEBUG_LIST
   printlist();
+#endif
   return 0;
 }
 
@@ -432,7 +438,7 @@ static void segregate(void *bp) {
   size_t size = BLK_SIZE(bp);
   char **listblock = (segblock(size)); // get where to put this free block
 
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf("| | | | segregate BEGIN for %p(%d=%d) to %p:%c", bp, BLK_SIZE(bp), GET_SIZE(FTRP(bp)), listblock, LIST_ALLOC_CHAR(*listblock));
 if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO SEGREGATE!!");
 #endif
@@ -443,7 +449,7 @@ if(BLK_ALLOC(bp)) printf("  BLOCK IS ALLOCATED BUT TRYING TO SEGREGATE!!");
     NEXT_FREE_ADDR(bp) = NULL;
     PUT(HDRP(bp), FREEPACK(size, 4, 2, 0));
     PUT(FTRP(bp), FREEPACK(size, 4, 2, 0));
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf(" -- seglist is empty! segregate DONE: %p, root: %d, tail: %d\n", bp, GET_ROOT(bp), GET_TAIL(bp));
 #endif
     return;
@@ -461,7 +467,7 @@ printf(" -- seglist is empty! segregate DONE: %p, root: %d, tail: %d\n", bp, GET
   NEXT_FREE_ADDR(bp) = oldroot;
   if(BLK_SIZE(bp) > NOPREVFREE) PREV_FREE_ADDR(bp) = NULL;
 
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf(" -- segregate DONE for (%d=%d)\n", BLK_SIZE(bp), GET_SIZE(FTRP(bp)));
 #endif
 
@@ -476,19 +482,19 @@ static void unsegregate(void *bp) {
   char *prevblock;
   char *nextblock;
 
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf("| | | | UNsegregate BEGIN for %p(%d) - root:%d, tail:%d at %p ", bp, BLK_SIZE(bp), GET_ROOT(bp), GET_TAIL(bp), listblock);
 #endif
 
   if (GET_ROOT(bp)) { //bp is root
 
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf(" -- bp is root of %p! ", listblock);
 #endif
 
     if(GET_TAIL(bp)) { //both root and tail
 
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf(" -- bp is also tail! -- Unsegregate DONE\n");
 #endif
 
@@ -502,7 +508,7 @@ printf(" -- bp is also tail! -- Unsegregate DONE\n");
     *HDRP(nextblock) = (*HDRP(nextblock) | 0x4); //set next block as root
     *FTRP(nextblock) = (*FTRP(nextblock) | 0x4);
   } else if (GET_TAIL(bp)) { //bp is tail
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf(" -- bp is tail!");
 #endif
     prevblock = PREV_FREE_ADDR(bp);
@@ -511,7 +517,7 @@ printf(" -- bp is tail!");
     *FTRP(prevblock) = (*FTRP(prevblock) | 0x2);
     NEXT_FREE_ADDR(prevblock) = NULL; //initialize nextaddr of new tail
   } else {
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf(" -- bp isn't tail nor root\n");
 #endif
     prevblock = PREV_FREE_ADDR(bp);
@@ -520,7 +526,7 @@ printf(" -- bp isn't tail nor root\n");
     NEXT_FREE_ADDR(prevblock) = nextblock; // prevblock can be defined if size of bp > NOPREVFREE
     if(BLK_SIZE(nextblock) > NOPREVFREE) PREV_FREE_ADDR(nextblock) = prevblock;
   }
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf(" -- UNsegregation DONE\n");
 #endif
   return;
@@ -546,6 +552,7 @@ printf("| | extend_heap BEGIN -- size:%zu\n", words);
   PUT(HDRP(bp), PACK(size, 0)); // Free block header
   PUT(FTRP(bp), PACK(size, 0)); // Free block footer
   PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); //New epilogue header
+  lastblock = NEXT_BLKP(bp);
 
   bp = coalesce(bp);
 
@@ -596,7 +603,7 @@ printf("(next is empty)");
   else if (!prev_alloc && next_alloc) { // prev is empty
 
 #ifdef DEBUG
-printf("(prev is empty) \n");
+printf("(prev is empty)");
 #endif
 
     unsegregate(PREV_BLKP(bp));
@@ -630,7 +637,7 @@ printf(" -- coalesce DONE\n");
 
 /**/
 static void *find_from_list(size_t asize, char **listblock) {
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf("| | | | | find_from_list: %p(%p) ", listblock, *listblock);
 #endif
 
@@ -638,23 +645,26 @@ printf("| | | | | find_from_list: %p(%p) ", listblock, *listblock);
   char *closestblock = NULL;
 
   if(*listblock == NULL) {
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf(" -- list is NULL -- end findlist\n");
 #endif
     return NULL;
   }
 
-  if(BLK_SIZE(*listblock) > asize)
+  if(BLK_SIZE(*listblock) >= asize)
     closestblock = *listblock;
 
-  for(bp = *listblock; GET_TAIL(bp) != 0 && NEXT_FREE_ADDR(bp) != NULL; bp = NEXT_FREE_ADDR(bp)) {
-    if(BLK_SIZE(bp) > asize) {
+  for(bp = *listblock; GET_TAIL(bp) == 0 && NEXT_FREE_ADDR(bp) != NULL; bp = NEXT_FREE_ADDR(bp)) {
+    if(BLK_SIZE(bp) >= asize) {
       if(closestblock == NULL || BLK_SIZE(closestblock) > BLK_SIZE(bp)) {
         closestblock = bp;
+#ifdef DEBUG_LIST
+printf(" -- cb:%p(%d) --", bp, BLK_SIZE(bp));
+#endif
       }
     }
   }
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf(" -- found block! : %p\n", closestblock);
 #endif
   return closestblock;
@@ -662,21 +672,21 @@ printf(" -- found block! : %p\n", closestblock);
 
 /**/
 static void *find_smallest_from_list(char **listblock) {
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf("| | | | | find_smallest_from_list: %p(%p)", listblock, *listblock);
 #endif
   char *bp = 0;
   char *smallestblock = NULL;
 
   if(listblock == LIST_PTR(list6, 6)) {
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf(" -- reached end of the blocks -- can't find\n");
 #endif
     return NULL;
   }
 
   if(*listblock == NULL) {
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf(" -- searching next list..\n");
 #endif
     return find_smallest_from_list(++listblock);
@@ -688,7 +698,7 @@ printf(" -- searching next list..\n");
       smallestblock = bp;
   }
 
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf(" -- found block! : %p\n", smallestblock);
 #endif
   return smallestblock;
@@ -707,7 +717,7 @@ static void *find_fit(size_t asize) {
   //   }
   // }
   // return NULL;
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 printf("| | | | find_fit BEGIN\n");
 #endif
 
@@ -720,7 +730,7 @@ printf("| | | | find_fit BEGIN\n");
   if(closestblock == NULL)
     closestblock = find_smallest_from_list(++listblock);
 
-#ifdef DEBUG
+#ifdef DEBUG_LIST
 if(closestblock != NULL)
   printf(" -- find_fit END:%p(%d) \n", closestblock, BLK_SIZE(closestblock));
 else
@@ -742,7 +752,7 @@ printf("| | place BEGIN at:%p(%d) size:%zu", bp, BLK_SIZE(bp), asize);
 
   unsegregate(bp);
 
-  if((csize > asize + (2*DSIZE))) { //Normal case
+  if((csize > asize + DSIZE)) { //Normal case
     PUT(HDRP(bp), PACK(asize, 1));
     PUT(FTRP(bp), PACK(asize, 1));
     bp = NEXT_BLKP(bp);
