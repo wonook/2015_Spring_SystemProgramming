@@ -354,6 +354,9 @@ mm_check();
 /* ===============================  FOR TESTING  ========================= */
 /*
  * mm_check - checks heap consistency : prints FATAL on inconsistency errors.
+ * !!This is not all of the debugging process!! check the code inside #ifdef and #endif.
+ * There are various tools that you can use by enabling #define DEBUG and #define DEBUG_LIST.
+ * this function checks heap and list consistency.
  * 
  */
 int mm_check(void) {
@@ -371,11 +374,14 @@ void printheap(void) {
   printf("\tCURRENT HEAP: ");
   void *bp = 0;
   size_t size;
+  int allocflag = 0;
 
   for(bp = heap_listp; BLK_SIZE(bp) > 0; bp = NEXT_BLKP(bp)) {
     size = (BLK_SIZE(bp));
     printf("| %p:%zu%2c |", bp, size, BLK_ALLOC_CHAR(bp));
     if(*HDRP(bp) != *FTRP(bp)) printf("==FATAL: HDR AND FTR DOESN'T MATCH: %p==", bp); // checks if the header and footer matches each other
+    if(!(allocflag || BLK_ALLOC(bp))) printf("==FATAL: FREE BLOCKS HAVEN'T BEEN COALESCED: %p==", bp); // checks if the heap doesn't have consecutive free blocks
+    allocflag = BLK_ALLOC(bp);
   }
   size = (BLK_SIZE(bp));
   printf("| %p:%zu%2c |\n", bp, size, BLK_ALLOC_CHAR(bp)); // epilogue block
@@ -388,6 +394,7 @@ void printheap(void) {
 void printlist(void) {
   printf("\tCURRENT LIST: ");
   char **listblock;
+  char *bp=0;
   int i;
 
   listblock = list1;
@@ -690,6 +697,10 @@ printf(" -- list is NULL -- end findlist\n");
     closestblock = *listblock;
 
   for(bp = *listblock; GET_TAIL(bp) == 0 && NEXT_FREE_ADDR(bp) != NULL; bp = NEXT_FREE_ADDR(bp)) {
+#ifdef DEBUG_LIST
+if(BLK_ALLOC(bp))
+  printf("==FATAL:ALLOCATED BLOCK(%p) IS IN THE SEGLIST==", bp);
+#endif
     if(BLK_SIZE(bp) >= asize) { // it has to be larger than the required amount.
       if(closestblock == NULL || BLK_SIZE(closestblock) > BLK_SIZE(bp)) { // if closestblock is null or if there is a better block
         closestblock = bp;
