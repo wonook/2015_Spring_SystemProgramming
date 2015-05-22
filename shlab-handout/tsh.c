@@ -31,7 +31,7 @@
 #define ST 3    /* stopped */
 
 /* DEBUG */
-#define DEBUG
+//#define DEBUG
 
 /*
  * Jobs states: FG (foreground), BG (background), ST (stopped)
@@ -184,6 +184,8 @@ void eval(char *cmdline)
   struct job_t *job;
 
   isbg = parseline(cmdline, argv);
+
+  if(argv[0] == NULL) return; // empty lines
   
   if(!builtin_cmd(argv)) { // if not built in, fork and exec in a child process
 #ifdef DEBUG
@@ -194,9 +196,21 @@ printf("--fork & exec process! (not built-in)\n");
       printf("%s: Command not found\n", argv[0]); //if it returns, it means it couldn't find
       exit(0);
     } 
-    addjob(jobs, pid, isbg ? BG : FG, cmdline);
+
+    if(!addjob(jobs, pid, isbg ? BG : FG, cmdline)) {
+      return;
+    }
+
     if(!isbg) {
+#ifdef DEBUG
+printf("foreground job");
+#endif
       waitfg(pid);
+      job = getjobpid(jobs, pid); //after termination
+      if(job != NULL && job->state != ST) {
+        kill(pid, SIGKILL);
+        deletejob(jobs, pid);
+      }
     } else { //if it is a background job, print a status messsage
       /* [1] (10113) ./myspin 1 & */
       job = getjobpid(jobs, pid);
@@ -273,10 +287,13 @@ int builtin_cmd(char **argv)
   if (strcmp("quit", argv[0]) == 0) {
     exit(0);
   } else if (strcmp("jobs", argv[0]) == 0) {
+    listjobs(jobs);
     return 1;
   } else if (strcmp("fg", argv[0]) == 0) {
+    do_bgfg(argv);
     return 1;
   } else if (strcmp("bg", argv[0]) == 0) {
+    do_bgfg(argv);
     return 1;
   }
   return 0;     /* not a builtin command */
@@ -287,6 +304,54 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv)
 { //TODO3
+  pid_t pid;
+  struct job_t *job;
+  int jid;
+
+  if(argv[1] == NULL) {
+    /*bg command requires PID or %jobid argument*/
+    printf("%s command requires PID or %%jobid argument\n", argv[0]);
+    return;
+  }
+
+  if(argv[1][0] == '%') { //job id
+    jid = atoi(&argv[1][1]);
+
+    if(!(job = getjobjid(jobs, jid))) {
+      printf("%s: No such job\n", argv[1]);
+      return;
+    }
+    
+    pid = job->pid;
+  } else if(argv[1][0] >= '0' && argv[1][0] <= '9') { //process id
+    pid = atoi(argv[1]);
+
+    if(!(job = getjobpid(jobs, pid))) {
+      printf("(%s): No such process\n", argv[1]);
+      return;
+    }
+
+    jid = job->jid;
+  } else {
+    /*bg: argument must be a PID or %jobid*/
+    printf("%s: argument must be a PID or %%jobid\n", argv[0]);
+    return;
+  }
+
+  kill(-pid, SIGCONT);
+
+  if(strcmp("fg", argv[0]) == 0) {
+    job->state = FG;
+    waitfg(pid);
+    if(job != NULL && job->state != ST) {
+      kill(pid, SIGKILL);
+      deletejob(jobs, pid);
+    }
+  } else if(strcmp("bg", argv[0]) == 0) {
+    job->state = BG;
+    /*[2] (7350) ./myspin 5*/
+    printf("[%d] (%d) %s", jid, pid, job->cmdline);
+  }
   return;
 }
 
@@ -321,8 +386,16 @@ void sigchld_handler(int sig)
   int status;
   struct job_t *job;
 
-  while((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+  while((pid = waitpid(-1, &status, WNOHANG|WUNTRACED)) > 0) {
     job = getjobpid(jobs, pid);
+
+    if (WIFSIGNALED(status)) {
+      /*printf("Job [%d] (%d) terminated by signal %d\n", job->jid, pid, WTERMSIG(status));*/
+    } else if (WIFSTOPPED(status)) {
+      /*printf("Job [%d] (%d) stopped by signal %d\n", job->jid, pid, WSTOPSIG(status));*/
+      /*job->state = ST;*/
+      /*return;*/
+    }
     deletejob(jobs, pid);
   }
   return;
@@ -335,6 +408,18 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig)
 { //TODO6
+  pid_t pid;
+  struct job_t *job;
+  
+  pid = fgpid(jobs);
+  job = getjobpid(jobs, pid);
+
+  if(pid != 0) {
+    kill(-pid, SIGINT);
+    printf("Job [%d] (%d) terminated by signal %d\n", job->jid, job->pid, SIGINT);
+    deletejob(jobs, pid);
+  }
+
   return;
 }
 
@@ -345,6 +430,17 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig)
 { //TODO7
+  pid_t pid;
+  struct job_t *job;
+
+  pid = fgpid(jobs);
+  job = getjobpid(jobs, pid);
+
+  if(pid != 0) {
+    kill(-pid, SIGTSTP);
+    printf("Job [%d] (%d) stopped by signal %d\n", job->jid, job->pid, SIGTSTP);
+    job->state = ST;
+  }
   return;
 }
 
