@@ -30,6 +30,9 @@
 #define BG 2    /* running in background */
 #define ST 3    /* stopped */
 
+/* DEBUG */
+#define DEBUG
+
 /*
  * Jobs states: FG (foreground), BG (background), ST (stopped)
  * Job state transitions and enabling actions:
@@ -175,6 +178,32 @@ int main(int argc, char **argv)
  */
 void eval(char *cmdline)
 { //TODO1
+  char *argv[MAXARGS];
+  int isbg;
+  pid_t pid;
+  struct job_t *job;
+
+  isbg = parseline(cmdline, argv);
+  
+  if(!builtin_cmd(argv)) { // if not built in, fork and exec in a child process
+#ifdef DEBUG
+printf("--fork & exec process! (not built-in)\n");
+#endif
+    if((pid = fork()) == 0) {
+      execvp(argv[0], argv);
+      printf("%s: Command not found\n", argv[0]); //if it returns, it means it couldn't find
+      exit(0);
+    } 
+    addjob(jobs, pid, isbg ? BG : FG, cmdline);
+    if(!isbg) {
+      waitfg(pid);
+    } else { //if it is a background job, print a status messsage
+      /* [1] (10113) ./myspin 1 & */
+      job = getjobpid(jobs, pid);
+      printf("[%d] (%d) %s", job->jid, job->pid, cmdline);
+    }
+  }
+
   return;
 }
 
@@ -241,6 +270,15 @@ int parseline(const char *cmdline, char **argv)
  */
 int builtin_cmd(char **argv)
 { //TODO2
+  if (strcmp("quit", argv[0]) == 0) {
+    exit(0);
+  } else if (strcmp("jobs", argv[0]) == 0) {
+    return 1;
+  } else if (strcmp("fg", argv[0]) == 0) {
+    return 1;
+  } else if (strcmp("bg", argv[0]) == 0) {
+    return 1;
+  }
   return 0;     /* not a builtin command */
 }
 
@@ -257,6 +295,12 @@ void do_bgfg(char **argv)
  */
 void waitfg(pid_t pid)
 { //TODO4
+  struct job_t *job;
+  
+  job = getjobpid(jobs, pid);
+  while(job->state == FG) {
+    sleep(1);
+  }
   return;
 }
 
@@ -273,6 +317,14 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig)
 { //TODO5
+  pid_t pid;
+  int status;
+  struct job_t *job;
+
+  while((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+    job = getjobpid(jobs, pid);
+    deletejob(jobs, pid);
+  }
   return;
 }
 
