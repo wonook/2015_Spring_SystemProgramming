@@ -174,7 +174,7 @@ int main(int argc, char **argv)
  * when we type ctrl-c (ctrl-z) at the keyboard.
  */
 void eval(char *cmdline)
-{
+{ //TODO1
   return;
 }
 
@@ -240,7 +240,7 @@ int parseline(const char *cmdline, char **argv)
  *    it immediately.
  */
 int builtin_cmd(char **argv)
-{
+{ //TODO2
   return 0;     /* not a builtin command */
 }
 
@@ -248,7 +248,7 @@ int builtin_cmd(char **argv)
  * do_bgfg - Execute the builtin bg and fg commands
  */
 void do_bgfg(char **argv)
-{
+{ //TODO3
   return;
 }
 
@@ -256,7 +256,7 @@ void do_bgfg(char **argv)
  * waitfg - Block until process pid is no longer the foreground process
  */
 void waitfg(pid_t pid)
-{
+{ //TODO4
   return;
 }
 
@@ -272,7 +272,7 @@ void waitfg(pid_t pid)
  *     currently running children to terminate.
  */
 void sigchld_handler(int sig)
-{
+{ //TODO5
   return;
 }
 
@@ -282,7 +282,7 @@ void sigchld_handler(int sig)
  *    to the foreground job.
  */
 void sigint_handler(int sig)
-{
+{ //TODO6
   return;
 }
 
@@ -292,7 +292,7 @@ void sigint_handler(int sig)
  *     foreground job by sending it a SIGTSTP.
  */
 void sigtstp_handler(int sig)
-{
+{ //TODO7
   return;
 }
 

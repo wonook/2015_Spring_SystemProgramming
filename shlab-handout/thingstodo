@@ -1,0 +1,11 @@
+./bin/ls
+./bin/ps
+./myspin 12 &
+jobs
+fg %1
+stopped by signal 20 (ctrl z)
+bg %1
+quit
+
+make test01
+make rtest01 (refshell)
