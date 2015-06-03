@@ -1,8 +1,8 @@
 /*
  * proxy.c - CS:APP Web proxy
  *
- * Student ID: 2013-11406
- *         Name: Won Wook SONG
+ * Student ID: 
+ *         Name:
  * 
  * IMPORTANT: Give a high level description of your code here. You
  * must also provide a header comment at the beginning of each

@@ -9,13 +9,13 @@ PROGS = echoclient echoserver proxy
 all: $(PROGS)
 
 echoclient: echoclient.c csapp.o csapp.h
-	$(CC) $(CFLAGS) $(LIBS) -o echoclient echoclient.c csapp.o
+	$(CC) $(CFLAGS) -o echoclient echoclient.c csapp.o $(LIBS)
 
 echoserver: echoservert.c csapp.o csapp.h echo.o echo.h
-	$(CC) $(CFLAGS) $(LIBS) -o echoserver echoservert.c csapp.o echo.o
+	$(CC) $(CFLAGS) -o echoserver echoservert.c csapp.o echo.o $(LIBS)
 
 proxy: proxy.c csapp.o csapp.h
-	$(CC) $(CFLAGS) $(LIBS) -o proxy proxy.c csapp.o
+	$(CC) $(CFLAGS) -o proxy proxy.c csapp.o $(LIBS)
 
 csapp.o: csapp.c csapp.h
 	$(CC) $(CFLAGS) -c csapp.c
