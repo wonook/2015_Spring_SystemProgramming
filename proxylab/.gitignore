@@ -1,0 +1,4 @@
+*.o
+echoclient
+echoserver
+proxy
