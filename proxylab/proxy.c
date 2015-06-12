@@ -21,11 +21,12 @@
  * Functions to define
  */
 void *process_request(void* vargp);
+void return_errormsg(int fd, char *msg);
 int open_clientfd_ts(char *hostname, int port, sem_t *mutexp);
 ssize_t Rio_readn_w(int fd, void *ptr, size_t nbytes);
 ssize_t Rio_readlineb_w(rio_t *rp, void *usrbuf, size_t maxlen);
 void Rio_writen_w(int fd, void *usrbuf, size_t n);
-void print_log(struct sockaddr_in *sockaddr, int portnum, int size, char* msg);
+void print_log(char *host, int portnum, int size, char* msg);
 
 // pointer to the log file
 FILE* log_file;
@@ -133,18 +134,17 @@ void *process_request(void* vargp) {
 #ifdef DEBUG
 printf("| | string to process:%s", buffer);
 #endif
+
         host = strtok(buffer, " ");
         i = strlen(host);
         if(cnt <= i || cnt == i+2) { // only one argument
-            Rio_writen_w(connectfd, proxyerrormsg, strlen(proxyerrormsg));
-            printf("%s", proxyerrormsg);
+            return_errormsg(connectfd, proxyerrormsg);
             continue;
         }
         portstr = strtok(NULL, " ");
         i += strlen(portstr) + 1;
         if(cnt <= i || cnt == i+2 || portstr[0] < '0' || portstr[0] > '9') { // only two arguments OR portstr[0]!=number
-            Rio_writen_w(connectfd, proxyerrormsg, strlen(proxyerrormsg));
-            printf("%s", proxyerrormsg);
+            return_errormsg(connectfd, proxyerrormsg);
             continue;
         }
         msg = strtok(NULL, " ");
@@ -153,19 +153,67 @@ printf("| | string to process:%s", buffer);
         port = atoi(portstr);
         V(&mutex);
         if(port <= 0 || port == connectport) { // error with the port number
-            Rio_writen_w(connectfd, proxyerrormsg, strlen(proxyerrormsg));
-            printf("%s", proxyerrormsg);
+            return_errormsg(connectfd, proxyerrormsg);
             continue;
         }
+
 #ifdef DEBUG
         printf("| | after processing: host:%s, port:%s, msg:%s", host, portstr, msg);
 #endif
 
         // open clientfd
+        if(clientfd = open_clientfd_ts(host, port, &mutex) < 0) {
+            char *openclientfderr = "Warning: open_clientfd failed - unable to connect to end server\n";
+            return_errormsg(connectfd, openclientfderr);
+            continue;
+        }
+
+        // connect to the server
+        Rio_readinitb(&rio_server, clientfd);
+        Rio_writen_w(clientfd, msg, strlen(msg));
+        if((cnt = Rio_readlineb_w(&rio_server, buffer, MAXLINE)) <= 0) {
+            return_errormsg(connectfd, proxyerrormsg);
+        } else {
+            Rio_writen_w(connectfd, buffer, strlen(buffer));
+            print_log(hostaddr, port, cnt, msg);
+        }
+        Close(clientfd);
     }
+    
+    // close Rio_readinitb
+    Close(connectfd);
+    return;
+}
+
+void return_errormsg(int fd, char *msg) {
+    Rio_writen_w(fd, msg, strlen(msg));
+    printf("%s", msg);
+    return;
 }
 
 int open_clientfd_ts(char *hostname, int port, sem_t *mutexp) {
+    int clientfd;
+    struct hostent hstnt, *hp = &hstnt, *hp_tmp;
+    struct sockaddr_in serveraddr;
+
+    if(clientfd = socket(AF_INET, SOCK_STREAM, 0) < 0) return -1;
+    printf("%d\n", clientfd);
+
+    P(mutexp);
+    hp_tmp = gethostbyname(hostname);
+    if(hp_tmp != NULL) hstnt = *hp_tmp;
+    V(mutexp);
+
+    if(hp_tmp == NULL) return -2;
+
+    bzero((char *) &serveraddr, sizeof(serveraddr)); 
+    serveraddr.sin_family = AF_INET; 
+    bcopy((char *)hp->h_addr, (char *)&serveraddr.sin_addr.s_addr, hp->h_length); 
+    serveraddr.sin_port = htons(port);
+
+    if ((connect(clientfd, (SA *) &serveraddr, sizeof(serveraddr))) < 0) return -1;
+    printf("blah3\n");
+    return clientfd;
 }
 
 ssize_t Rio_readn_w(int fd, void *ptr, size_t nbytes) {
@@ -192,24 +240,16 @@ void Rio_writen_w(int fd, void *usrbuf, size_t n) {
     }
 }
 
-void print_log(struct sockaddr_in *sockaddr, int portnum, int size, char* msg) {
-    char log_string[512]; 
+void print_log(char *host, int portnum, int size, char* msg) {
+    char log_string[MAXLINE]; 
 
     time_t now;
-    char time_str[128];
+    char time_str[MAXLINE];
 
     now = time(NULL);
     strftime(time_str, MAXLINE, "%a %d %b %Y %H:%M:%S %Z", localtime(&now));
 
-    unsigned long host;
-    unsigned char a, b, c, d;
-    host = ntohl(sockaddr->sin_addr.s_addr);
-    a = host >> 24;
-    b = (host >> 16) & 0xff;
-    c = (host >> 8) & 0xff;
-    d = host & 0xff;
-
-    sprintf(log_string, "%s: %d.%d.%d.%d %d %d %s\n", time_str, a, b, c, d, portnum, size, msg);
+    sprintf(log_string, "%s: %s %d %d %s\n", time_str, host, portnum, size, msg);
 
     P(&mutex_log);
     fprintf(log_file, log_string);
