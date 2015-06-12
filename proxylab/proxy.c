@@ -31,6 +31,7 @@ void print_log(struct sockaddr_in *sockaddr, int portnum, int size, char* msg);
 FILE* log_file;
 // mutexes
 sem_t mutex, mutex_log;
+int totalcnt;
 
 // struct for the arguments passed onto the thread
 struct thread_args {
@@ -57,6 +58,8 @@ int main(int argc, char **argv)
 
     // set up logfile
     log_file = Fopen(PROXY_LOG, "w");
+    // initialize totalcnt
+    totalcnt = 0;
     // initialize mutex to 1.
     Sem_init(&mutex, 0, 1);
     Sem_init(&mutex_log, 0, 1);
@@ -84,16 +87,82 @@ int main(int argc, char **argv)
     exit(0);
 }
 
+/*
+ * Each thread processes each request through the variables passed
+ */
 void *process_request(void* vargp) {
+    pthread_t tid = pthread_self();
+    printf("Served by thread %u\n", tid);
+    Pthread_detach(tid);
+
     int connectfd = ((struct thread_args*)vargp)->connectfd;
     int connectport = ((struct thread_args*)vargp)->connectport;
     char hostaddr[MAXLINE];
     strcpy(hostaddr, ((struct thread_args*)vargp)->hostaddr);
-    pthread_t tid = pthread_self();
 
-    printf("Served by thread %u\n", tid);
-    Pthread_detach(tid);
+#ifdef DEBUG
+  printf("| process request -> connectfd:%d connectport:%d, hostaddr:%s\n", connectfd, ((struct thread_args*)vargp)->connectport, hostaddr);
+#endif
+    // this frees argp in main()
     Free(vargp);
+
+    // read stuff from the connectfd.
+    char buffer[MAXLINE];
+    rio_t rio_client;
+    rio_t rio_server;
+    int cnt, i;
+
+    Rio_readinitb(&rio_client, connectfd);
+    while(1) {
+        if((cnt = Rio_readlineb_w(&rio_client, buffer, MAXLINE)) <= 0) {
+            printf("bad request error\n");
+            close(connectfd);
+            return;
+        }
+
+        char *host, *portstr, *msg;
+        int clientfd, port;
+
+        P(&mutex);
+        totalcnt += cnt;
+        V(&mutex);
+        printf("Thread %u received %d bytes (%d total)\n", tid, cnt, totalcnt);
+
+        char *proxyerrormsg = "proxy usage: <host> <port> <message>\n";
+        // process out the buffer
+#ifdef DEBUG
+printf("| | string to process:%s", buffer);
+#endif
+        host = strtok(buffer, " ");
+        i = strlen(host);
+        if(cnt <= i || cnt == i+2) { // only one argument
+            Rio_writen_w(connectfd, proxyerrormsg, strlen(proxyerrormsg));
+            printf("%s", proxyerrormsg);
+            continue;
+        }
+        portstr = strtok(NULL, " ");
+        i += strlen(portstr) + 1;
+        if(cnt <= i || cnt == i+2 || portstr[0] < '0' || portstr[0] > '9') { // only two arguments OR portstr[0]!=number
+            Rio_writen_w(connectfd, proxyerrormsg, strlen(proxyerrormsg));
+            printf("%s", proxyerrormsg);
+            continue;
+        }
+        msg = strtok(NULL, " ");
+
+        P(&mutex);
+        port = atoi(portstr);
+        V(&mutex);
+        if(port <= 0 || port == connectport) { // error with the port number
+            Rio_writen_w(connectfd, proxyerrormsg, strlen(proxyerrormsg));
+            printf("%s", proxyerrormsg);
+            continue;
+        }
+#ifdef DEBUG
+        printf("| | after processing: host:%s, port:%s, msg:%s", host, portstr, msg);
+#endif
+
+        // open clientfd
+    }
 }
 
 int open_clientfd_ts(char *hostname, int port, sem_t *mutexp) {
