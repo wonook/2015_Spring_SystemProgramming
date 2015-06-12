@@ -27,15 +27,26 @@ ssize_t Rio_readlineb_w(rio_t *rp, void *usrbuf, size_t maxlen);
 void Rio_writen_w(int fd, void *usrbuf, size_t n);
 void print_log(struct sockaddr_in *sockaddr, int portnum, int size, char* msg);
 
+// pointer to the log file
 FILE* log_file;
+// mutexes
 sem_t mutex, mutex_log;
+
+// struct for the arguments passed onto the thread
+struct thread_args {
+    int connectfd;
+    int connectport;
+    char hostaddr[MAXLINE];
+};
 
 /*
  * main - Main routine for the proxy program
  */
 int main(int argc, char **argv)
 {
-    int listenfd, port; // port num and listening descriptor.
+    int listenfd, listenport; // listening port num and listening descriptor.
+    struct sockaddr_in clientaddr;
+    int clientleng = sizeof(clientaddr);
     pthread_t tid;
 
     /* Check arguments */
@@ -48,17 +59,41 @@ int main(int argc, char **argv)
     log_file = Fopen(PROXY_LOG, "w");
     // initialize mutex to 1.
     Sem_init(&mutex, 0, 1);
+    Sem_init(&mutex_log, 0, 1);
 
     // set up listening descriptor
-    port = atoi(argv[1]);
-    listenfd = Open_listenfd(port);
+    listenport = atoi(argv[1]);
+    listenfd = Open_listenfd(listenport);
 
+    while(1) {
+        struct thread_args *argp = (struct thread_args*) malloc(sizeof(struct thread_args));
 
+        //set up connection descriptor.
+        argp->connectfd = Accept(listenfd, (SA *) &clientaddr, &clientleng);
+        argp->connectport = ntohs(clientaddr.sin_port);
+        strcpy(argp->hostaddr, inet_ntoa(clientaddr.sin_addr));
+
+        struct hostent *hp = Gethostbyaddr((const char *)&clientaddr.sin_addr.s_addr, sizeof(clientaddr.sin_addr.s_addr), AF_INET);
+
+        printf("Proxy server connected to %s (%s), port %d\n", hp->h_name, argp->hostaddr, argp->connectport);
+
+        // create a thread that processes given request.
+        Pthread_create(&tid, NULL, process_request, argp);
+    }
 
     exit(0);
 }
 
 void *process_request(void* vargp) {
+    int connectfd = ((struct thread_args*)vargp)->connectfd;
+    int connectport = ((struct thread_args*)vargp)->connectport;
+    char hostaddr[MAXLINE];
+    strcpy(hostaddr, ((struct thread_args*)vargp)->hostaddr);
+    pthread_t tid = pthread_self();
+
+    printf("Served by thread %u\n", tid);
+    Pthread_detach(tid);
+    Free(vargp);
 }
 
 int open_clientfd_ts(char *hostname, int port, sem_t *mutexp) {
