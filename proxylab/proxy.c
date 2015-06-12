@@ -31,7 +31,7 @@ void print_log(char *host, int portnum, int size, char* msg);
 // pointer to the log file
 FILE* log_file;
 // mutexes
-sem_t mutex, mutex_log;
+sem_t mutex;
 int totalcnt;
 
 // struct for the arguments passed onto the thread
@@ -63,7 +63,6 @@ int main(int argc, char **argv)
     totalcnt = 0;
     // initialize mutex to 1.
     Sem_init(&mutex, 0, 1);
-    Sem_init(&mutex_log, 0, 1);
 
     // set up listening descriptor
     listenport = atoi(argv[1]);
@@ -147,7 +146,7 @@ printf("| | string to process:%s", buffer);
             return_errormsg(connectfd, proxyerrormsg);
             continue;
         }
-        msg = strtok(NULL, " ");
+        msg = strtok(NULL, "`");
 
         P(&mutex);
         port = atoi(portstr);
@@ -162,7 +161,7 @@ printf("| | string to process:%s", buffer);
 #endif
 
         // open clientfd
-        if(clientfd = open_clientfd_ts(host, port, &mutex) < 0) {
+        if((clientfd = open_clientfd_ts(host, port, &mutex)) < 0) {
             char *openclientfderr = "Warning: open_clientfd failed - unable to connect to end server\n";
             return_errormsg(connectfd, openclientfderr);
             continue;
@@ -196,8 +195,7 @@ int open_clientfd_ts(char *hostname, int port, sem_t *mutexp) {
     struct hostent hstnt, *hp = &hstnt, *hp_tmp;
     struct sockaddr_in serveraddr;
 
-    if(clientfd = socket(AF_INET, SOCK_STREAM, 0) < 0) return -1;
-    printf("%d\n", clientfd);
+    if ((clientfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) return -1;
 
     P(mutexp);
     hp_tmp = gethostbyname(hostname);
@@ -212,7 +210,6 @@ int open_clientfd_ts(char *hostname, int port, sem_t *mutexp) {
     serveraddr.sin_port = htons(port);
 
     if ((connect(clientfd, (SA *) &serveraddr, sizeof(serveraddr))) < 0) return -1;
-    printf("blah3\n");
     return clientfd;
 }
 
@@ -251,10 +248,10 @@ void print_log(char *host, int portnum, int size, char* msg) {
 
     sprintf(log_string, "%s: %s %d %d %s\n", time_str, host, portnum, size, msg);
 
-    P(&mutex_log);
+    P(&mutex);
     fprintf(log_file, log_string);
     fflush(log_file);
-    V(&mutex_log);
+    V(&mutex);
 
     return;
 }
