@@ -57,6 +57,9 @@ int main(int argc, char **argv)
         exit(0);
     }
 
+    // ignore sigpipe signals
+    Signal(SIGPIPE, SIG_IGN);
+
     // set up logfile
     log_file = Fopen(PROXY_LOG, "w");
     // initialize totalcnt
@@ -115,7 +118,7 @@ void *process_request(void* vargp) {
     Rio_readinitb(&rio_client, connectfd);
     while(1) {
         if((cnt = Rio_readlineb_w(&rio_client, buffer, MAXLINE)) <= 0) {
-            printf("bad request error\n");
+            printf("Bad request!\n");
             close(connectfd);
             return;
         }
@@ -162,7 +165,7 @@ printf("| | string to process:%s", buffer);
 
         // open clientfd
         if((clientfd = open_clientfd_ts(host, port, &mutex)) < 0) {
-            char *openclientfderr = "Warning: open_clientfd failed - unable to connect to end server\n";
+            char *openclientfderr = "Warning: unable to connect to end server\n";
             return_errormsg(connectfd, openclientfderr);
             continue;
         }
@@ -174,7 +177,7 @@ printf("| | string to process:%s", buffer);
             return_errormsg(connectfd, proxyerrormsg);
         } else {
             Rio_writen_w(connectfd, buffer, strlen(buffer));
-            print_log(hostaddr, port, cnt, msg);
+            print_log(hostaddr, port, cnt, buffer);
         }
         Close(clientfd);
     }
@@ -184,18 +187,27 @@ printf("| | string to process:%s", buffer);
     return;
 }
 
+/*
+ *
+ */
 void return_errormsg(int fd, char *msg) {
     Rio_writen_w(fd, msg, strlen(msg));
     printf("%s", msg);
     return;
 }
 
+/*
+ *
+ */
 int open_clientfd_ts(char *hostname, int port, sem_t *mutexp) {
     int clientfd;
     struct hostent hstnt, *hp = &hstnt, *hp_tmp;
     struct sockaddr_in serveraddr;
 
     if ((clientfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) return -1;
+#ifdef DEBUG
+    printf("| | | clientfd: %d\n", clientfd);
+#endif
 
     P(mutexp);
     hp_tmp = gethostbyname(hostname);
@@ -213,6 +225,9 @@ int open_clientfd_ts(char *hostname, int port, sem_t *mutexp) {
     return clientfd;
 }
 
+/*
+ *
+ */
 ssize_t Rio_readn_w(int fd, void *ptr, size_t nbytes) {
     ssize_t read_count;  
     if ((read_count = rio_readn(fd, ptr, nbytes)) < 0) {  
@@ -222,6 +237,9 @@ ssize_t Rio_readn_w(int fd, void *ptr, size_t nbytes) {
     return read_count;  
 }
 
+/*
+ *
+ */
 ssize_t Rio_readlineb_w(rio_t *rp, void *usrbuf, size_t maxlen) {
     ssize_t read_count;
     if ((read_count = rio_readlineb(rp, usrbuf, maxlen)) < 0) {  
@@ -231,12 +249,18 @@ ssize_t Rio_readlineb_w(rio_t *rp, void *usrbuf, size_t maxlen) {
     return read_count;
 }
 
+/*
+ *
+ */
 void Rio_writen_w(int fd, void *usrbuf, size_t n) {
     if (rio_writen(fd, usrbuf, n) != n) {
         printf("Warning: rio_writen failed.\n");
     }
 }
 
+/*
+ *
+ */
 void print_log(char *host, int portnum, int size, char* msg) {
     char log_string[MAXLINE]; 
 
@@ -246,7 +270,10 @@ void print_log(char *host, int portnum, int size, char* msg) {
     now = time(NULL);
     strftime(time_str, MAXLINE, "%a %d %b %Y %H:%M:%S %Z", localtime(&now));
 
-    sprintf(log_string, "%s: %s %d %d %s\n", time_str, host, portnum, size, msg);
+    sprintf(log_string, "%s: %s %d %d %s", time_str, host, portnum, size, msg);
+#ifdef DEBUG
+    printf("| print log:%s", log_string);
+#endif
 
     P(&mutex);
     fprintf(log_file, log_string);
